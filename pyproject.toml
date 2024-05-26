@@ -1,0 +1,42 @@
+[project]
+license = { file = "LICENSE" }
+name = "faststats"
+version = "0.0.1"
+description = "your_description_here"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{ name = "Cangyuan Li", email = "everest229@gmail.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = []
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/CangyuanLi/faststats"
+"Source" = "https://github.com/CangyuanLi/faststats"
+"Bug Reports" = "https://github.com/CangyuanLi/faststats/issues"
+
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "faststats._rustystats"
+
+[tool.pytest.ini_options]
+addopts = "--cov=test_proj"
+testpaths = ["tests"]
+
+[tool.mypy]
+mypy_path = "src"
+ignore_missing_imports = true
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402", "F401"]

@@ -1,0 +1,38 @@
+name: Status update
+
+on:
+  push:
+    paths:
+      - src/**
+      - tests/**
+      - .github/**
+
+jobs:
+  coverage:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_dev.txt
+        pip install .
+
+    - name: Update coverage badge
+      run: |
+        python -m pytest tests/
+        coverage-badge -o assets/coverage.svg -f
+    - name: Commit changes
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "<>"
+
+        git add assets/coverage.svg
+
+        git commit -m "update coverage badge" && git push || echo "No changes to commit"
