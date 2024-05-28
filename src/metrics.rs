@@ -175,6 +175,25 @@ pub fn roc_auc(df: DataFrame) -> f64 {
     )
 }
 
+fn binary_search_right<T: PartialOrd>(arr: &[T], t: &T) -> Option<usize> {
+    // Can likely get rid of the partial_cmp, because I have gauranteed the values to be finite
+    let mut left = 0;
+    let mut right = arr.len();
+
+    while left < right {
+        let mid = left + ((right - left) >> 1);
+        if let Some(c) = arr[mid].partial_cmp(t) {
+            match c {
+                std::cmp::Ordering::Greater => right = mid,
+                _ => left = mid + 1,
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(left)
+}
+
 fn ks_2samp(v1: &[f64], v2: &[f64]) -> f64 {
     // https://github.com/scipy/scipy/blob/v1.11.3/scipy/stats/_stats_py.py#L8644-L8875
 
@@ -188,8 +207,8 @@ fn ks_2samp(v1: &[f64], v2: &[f64]) -> f64 {
         .chain(v2.iter())
         .map(|x| {
             (
-                (v1.binary_search_by(|val| val.total_cmp(x)).unwrap() as f64) / n1,
-                (v2.binary_search_by(|val| val.total_cmp(x)).unwrap() as f64) / n2,
+                (binary_search_right(v1, x).unwrap() as f64) / n1,
+                (binary_search_right(v2, x).unwrap() as f64) / n2,
             )
         })
         .fold(f64::MIN, |acc, (x, y)| acc.max((x - y).abs()));
