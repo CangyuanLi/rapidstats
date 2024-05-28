@@ -14,10 +14,11 @@ def _run_concurrent(
         concurrent.futures.ProcessPoolExecutor,
     ],
     preserve_order: bool = False,
+    quiet: bool = False,
     **executor_kwargs,
 ):
     if executor_kwargs.get("max_workers") == 1:
-        return [fn(i) for i in iterable]
+        return [fn(i) for i in tqdm.tqdm(iterable, disable=quiet)]
 
     if executor == "threads":
         executor = concurrent.futures.ThreadPoolExecutor(**executor_kwargs)
@@ -35,9 +36,7 @@ def _run_concurrent(
     with executor as pool:
         futures = [pool.submit(fn, i) for i in iterable]
         res = []
-        for future in tqdm.tqdm(
-            concurrent.futures.as_completed(futures), total=len(futures)
-        ):
+        for future in concurrent.futures.as_completed(futures):
             res.append(future.result())
 
     return res

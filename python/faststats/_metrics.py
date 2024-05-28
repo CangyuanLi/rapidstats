@@ -3,7 +3,7 @@ import dataclasses
 import polars as pl
 from polars.series.series import ArrayLike
 
-from ._rustystats import _confusion_matrix
+from ._rustystats import _confusion_matrix, _max_ks, _roc_auc
 
 
 @dataclasses.dataclass
@@ -34,6 +34,11 @@ class ConfusionMatrix:
     npv: float
     dor: float
 
+    def to_polars(self) -> pl.DataFrame:
+        dct = self.__dict__
+
+        return pl.DataFrame({"metric": dct.keys(), "value": dct.values()})
+
 
 def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
     df = pl.DataFrame({"y_true": y_true, "y_pred": y_pred}).with_columns(
@@ -41,3 +46,19 @@ def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
     )
 
     return ConfusionMatrix(*_confusion_matrix(df))
+
+
+def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
+        pl.col("y_true").cast(pl.Boolean)
+    )
+
+    return _roc_auc(df)
+
+
+def max_ks(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
+        pl.col("y_true").cast(pl.Boolean)
+    )
+
+    return _max_ks(df)
