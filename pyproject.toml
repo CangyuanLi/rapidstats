@@ -2,7 +2,7 @@
 license = { file = "LICENSE" }
 name = "faststats"
 version = "0.0.1"
-description = "your_description_here"
+description = "A library that implements fast statistical routines"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [{ name = "Cangyuan Li", email = "everest229@gmail.com" }]
@@ -10,7 +10,12 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = []
+dependencies = [
+    "polars==0.20.30",
+    "scipy==1.13.1",
+    "tqdm==4.66.4",
+    "pyarrow==16.1.0",
+]
 dynamic = ["version"]
 
 [project.urls]
@@ -28,7 +33,6 @@ python-source = "python"
 module-name = "faststats._rustystats"
 
 [tool.pytest.ini_options]
-addopts = "--cov=test_proj"
 testpaths = ["tests"]
 
 [tool.mypy]
