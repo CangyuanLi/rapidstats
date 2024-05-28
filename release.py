@@ -1,17 +1,19 @@
 import subprocess
-import sys
 import time
 
 import toml
 
 
 def main():
-    new_version = str(sys.argv[1])
+    with open("pyproject.toml", "r") as f:
+        pyproject_toml = toml.load(f)
+
+    version = pyproject_toml["package"]["version"]
 
     with open("Cargo.toml", "r") as f:
         cargo_toml = toml.load(f)
 
-    cargo_toml["package"]["version"] = new_version
+    cargo_toml["package"]["version"] = version
 
     with open("Cargo.toml", "w") as f:
         toml.dump(cargo_toml, f)
@@ -20,7 +22,7 @@ def main():
     time.sleep(2)
 
     print("committing version changes")
-    subprocess.run(["git", "commit", "-am", new_version], check=True)
+    subprocess.run(["git", "commit", "-am", version], check=True)
 
     print("pushing to remote")
     subprocess.run(["git", "push", "origin"], check=True)
@@ -28,7 +30,7 @@ def main():
 
     print("creating release")
     subprocess.run(
-        ["gh", "release", "create", f"v{new_version}", "--generate-notes"], check=True
+        ["gh", "release", "create", f"v{version}", "--generate-notes"], check=True
     )
 
 
