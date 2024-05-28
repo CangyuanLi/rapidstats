@@ -4,6 +4,8 @@ use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
 
+const BINARY_CM_VALUES: [i32; 4] = [0, 1, 2, 3];
+
 pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
     df.lazy()
         .select([(lit(2) * col("y_true") + col("y_pred")).alias("y")])
@@ -12,9 +14,30 @@ pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
 }
 
 pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
-    let s: Vec<f64> = base_cm["y"]
-        .value_counts(false, false)
-        .unwrap()
+    let value_counts = base_cm["y"].value_counts(false, false).unwrap();
+
+    let value_counts = if value_counts.height() < 4 {
+        let seen: Vec<i32> = value_counts["y"]
+            .i32()
+            .unwrap()
+            .iter()
+            .map(|x| x.unwrap())
+            .collect();
+        let not_seen: Vec<i32> = BINARY_CM_VALUES
+            .into_iter()
+            .filter(|x| !seen.contains(x))
+            .collect();
+
+        let zeros = vec![0u32; not_seen.len()];
+
+        value_counts
+            .vstack(&df!("y" => not_seen, "count" => zeros).unwrap())
+            .unwrap()
+    } else {
+        value_counts
+    };
+
+    let s: Vec<f64> = value_counts
         .sort(["y"], Default::default())
         .unwrap()
         .column("count")
