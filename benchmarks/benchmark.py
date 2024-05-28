@@ -6,11 +6,10 @@ from typing import Callable
 
 import numpy as np
 import polars as pl
+import rapidstats
 import scipy.stats
 import sklearn.metrics
 import tqdm
-
-import faststats
 
 np.random.seed(208)
 
@@ -57,7 +56,7 @@ class Bench:
 
 
 def fs_bootstrap_confusion_matrix(df):
-    bs = faststats.Bootstrap()
+    bs = rapidstats.Bootstrap()
     bs.confusion_matrix(df["y_true"], df["y_pred"])
 
 
@@ -66,7 +65,7 @@ def _cm_wrapper(df):
 
 
 def py_bootstrap_confusion_matrix(df):
-    faststats.bootstrap(df, stat_func=_cm_wrapper, quiet=True)
+    rapidstats.bootstrap(df, stat_func=_cm_wrapper, quiet=True)
 
 
 def for_loop_bootstrap_confusion_matrix(df):

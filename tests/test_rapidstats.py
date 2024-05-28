@@ -1,10 +1,9 @@
 import numpy as np
 import pytest
+import rapidstats
 import scipy.stats
 import sklearn.metrics
-
-import faststats
-from faststats._metrics import ConfusionMatrix
+from rapidstats._metrics import ConfusionMatrix
 
 np.random.seed(208)
 
@@ -96,7 +95,7 @@ def reference_confusion_matrix(y_true, y_pred):
 @pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
 def test_confusion_matrix(y_true, y_pred):
     ref = reference_confusion_matrix(y_true, y_pred).__dict__
-    fs = faststats.confusion_matrix(y_true, y_pred).__dict__
+    fs = rapidstats.confusion_matrix(y_true, y_pred).__dict__
 
     pytest.approx(list(fs.values())) == list(ref.values())
 
@@ -111,7 +110,7 @@ def reference_roc_auc(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_roc_auc(y_true, y_score):
     ref = reference_roc_auc(y_true, y_score)
-    fs = faststats.roc_auc(y_true, y_score)
+    fs = rapidstats.roc_auc(y_true, y_score)
 
     pytest.approx(fs) == ref
 
@@ -129,6 +128,6 @@ def reference_max_ks(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_max_ks(y_true, y_score):
     ref = reference_max_ks(y_true, y_score)
-    fs = faststats.max_ks(y_true, y_score)
+    fs = rapidstats.max_ks(y_true, y_score)
 
     pytest.approx(fs) == ref
