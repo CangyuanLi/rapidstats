@@ -1,11 +1,11 @@
 [package]
-name = "faststats"
+name = "rapidstats"
 version = "0.0.1"
 edition = "2021"
 
 [lib]
-name = "faststats"
-crate-type = [ "cdylib",]
+name = "rapidstats"
+crate-type = ["cdylib"]
 
 [dependencies]
 ndarray = "0.15.6"
@@ -15,4 +15,11 @@ rayon = "1.10.0"
 
 [dependencies.polars]
 version = "0.40.0"
-features = [ "performant", "random", "lazy", "ndarray", "cum_agg", "unique_counts",]
+features = [
+    "performant",
+    "random",
+    "lazy",
+    "ndarray",
+    "cum_agg",
+    "unique_counts",
+]

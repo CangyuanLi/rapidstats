@@ -308,17 +308,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95765f67b4b18863968b4a1bd5bb576f732b29a4a28c7cd84c09fa3e2875f33c"
 
 [[package]]
-name = "faststats"
-version = "0.0.1"
-dependencies = [
- "ndarray",
- "polars",
- "pyo3",
- "pyo3-polars",
- "rayon",
-]
-
-[[package]]
 name = "foreign_vec"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1240,6 +1229,17 @@ checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
 dependencies = [
  "num-traits",
  "rand",
+]
+
+[[package]]
+name = "rapidstats"
+version = "0.0.1"
+dependencies = [
+ "ndarray",
+ "polars",
+ "pyo3",
+ "pyo3-polars",
+ "rayon",
 ]
 
 [[package]]
