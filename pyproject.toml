@@ -19,9 +19,9 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-"Homepage" = "https://github.com/CangyuanLi/faststats"
-"Source" = "https://github.com/CangyuanLi/faststats"
-"Bug Reports" = "https://github.com/CangyuanLi/faststats/issues"
+"Homepage" = "https://github.com/CangyuanLi/rapidstats"
+"Source" = "https://github.com/CangyuanLi/rapidstats"
+"Bug Reports" = "https://github.com/CangyuanLi/rapidstats/issues"
 
 [build-system]
 requires = ["maturin>=1.5,<2.0"]
