@@ -1,7 +1,7 @@
 [project]
 license = { file = "LICENSE" }
 name = "rapidstats"
-version = "0.0.1"
+version = "0.0.2"
 description = "A library that implements fast statistical routines"
 readme = "README.md"
 requires-python = ">=3.8"
