@@ -1,8 +1,8 @@
 [project]
-license = { file = "LICENSE" }
 name = "rapidstats"
 version = "0.0.2"
 description = "A library that implements fast statistical routines"
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [{ name = "Cangyuan Li", email = "everest229@gmail.com" }]
@@ -16,7 +16,6 @@ dependencies = [
     "tqdm==4.66.4",
     "pyarrow==16.1.0",
 ]
-dynamic = ["version"]
 
 [project.urls]
 "Homepage" = "https://github.com/CangyuanLi/rapidstats"
