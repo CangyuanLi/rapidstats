@@ -25,6 +25,7 @@ jaraco.functools==4.0.1
 jeepney==0.8.0
 keyring==25.2.1
 markdown-it-py==3.0.0
+maturin==1.5.1
 mdurl==0.1.2
 more-itertools==10.2.0
 mypy==1.10.0
@@ -33,6 +34,7 @@ nh3==0.2.17
 nodeenv==1.8.0
 numpy==1.26.4
 packaging==24.0
+patchelf==0.17.2.1
 pathspec==0.12.1
 pkginfo==1.10.0
 platformdirs==4.2.2
