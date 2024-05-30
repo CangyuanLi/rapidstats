@@ -149,7 +149,13 @@ pub fn bootstrap_confusion_matrix(
         .iter()
         .zip(bs_df["mean"].f64().unwrap().iter())
         .zip(bs_df["upper"].f64().unwrap().iter())
-        .map(|((x, y), z)| (x.unwrap(), y.unwrap(), z.unwrap()))
+        .map(|((x, y), z)| {
+            (
+                x.unwrap_or(f64::NAN),
+                y.unwrap_or(f64::NAN),
+                z.unwrap_or(f64::NAN),
+            )
+        })
         .collect()
 }
 
