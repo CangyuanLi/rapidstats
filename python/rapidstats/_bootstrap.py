@@ -47,19 +47,31 @@ class BootstrappedConfusionMatrix:
 
     def to_polars(self) -> pl.DataFrame:
         dct = self.__dict__
-        lower = mean = upper = []
+        lower = []
+        mean = []
+        upper = []
         for l, m, u in dct.values():
             lower.append(l)
             mean.append(m)
             upper.append(u)
 
-        return pl.DataFrame(
-            {
-                "metric": dct.keys(),
-                "lower": lower,
-                "mean": mean,
-                "upper": upper,
-            }
+        return (
+            pl.DataFrame(
+                {
+                    "metric": dct.keys(),
+                    "lower": lower,
+                    "mean": mean,
+                    "upper": upper,
+                }
+            )
+            .fill_nan(None)
+            .with_columns(
+                pl.when(pl.col(c).is_infinite())
+                .then(None)
+                .otherwise(pl.col(c))
+                .alias(c)
+                for c in ["lower", "mean", "upper"]
+            )
         )
 
 
