@@ -159,6 +159,8 @@ pub fn bootstrap_confusion_matrix(
         .collect()
 }
 
+// AUC code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/num/tp_fp.rs
+
 fn trapz(y: ArrayView1<f64>, x: ArrayView1<f64>) -> f64 {
     let y_s = &y.slice(s![1..]) + &y.slice(s![..-1]);
     let x_d = &x.slice(s![1..]) - &x.slice(s![..-1]);
@@ -204,8 +206,9 @@ pub fn roc_auc(df: DataFrame) -> f64 {
     )
 }
 
+// Max KS code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/stats/ks.rs
+
 fn binary_search_right<T: PartialOrd>(arr: &[T], t: &T) -> Option<usize> {
-    // Can likely get rid of the partial_cmp, because I have gauranteed the values to be finite
     let mut left = 0;
     let mut right = arr.len();
 
@@ -230,7 +233,6 @@ fn ks_2samp(v1: &[f64], v2: &[f64]) -> f64 {
     let n1: f64 = v1.len() as f64;
     let n2: f64 = v2.len() as f64;
 
-    // Follow SciPy's trick to compute the difference between two CDFs
     let stats = v1
         .iter()
         .chain(v2.iter())
