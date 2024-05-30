@@ -1,13 +1,16 @@
 import numpy as np
 import pytest
-import rapidstats
 import scipy.stats
 import sklearn.metrics
+
+import rapidstats
 from rapidstats._metrics import ConfusionMatrix
 
-np.random.seed(208)
-
+SEED = 208
 N_ROWS = 1_000
+BOOTSTRAP_ITERATIONS = 100
+
+np.random.seed(SEED)
 
 
 Y_TRUE = np.random.choice([True, False], N_ROWS)
