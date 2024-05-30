@@ -1,4 +1,3 @@
-+Pygments==2.18.0
 black==24.4.2
 build==1.2.1
 cachetools==5.3.3
