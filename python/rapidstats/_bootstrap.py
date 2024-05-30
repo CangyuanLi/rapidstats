@@ -117,8 +117,12 @@ class Bootstrap:
         seed: Optional[int] = None,
     ) -> None:
         self.iterations = iterations
+        self.confidence = confidence
         self.z = scipy.stats.norm.ppf(confidence)
         self.seed = seed
+
+    def run(self, data, stat_func) -> ConfidenceInterval:
+        return bootstrap(data, stat_func, self.iterations, self.confidence, self.seed)
 
     def confusion_matrix(
         self,
