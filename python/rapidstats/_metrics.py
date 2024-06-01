@@ -3,7 +3,8 @@ import dataclasses
 import polars as pl
 from polars.series.series import ArrayLike
 
-from ._rustystats import _confusion_matrix, _max_ks, _roc_auc
+from ._rustystats import _brier_loss, _confusion_matrix, _max_ks, _roc_auc
+from ._utils import _y_true_y_pred_to_df, _y_true_y_score_to_df
 
 
 @dataclasses.dataclass
@@ -41,24 +42,24 @@ class ConfusionMatrix:
 
 
 def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
-    df = pl.DataFrame({"y_true": y_true, "y_pred": y_pred}).with_columns(
-        pl.col("y_true", "y_pred").cast(pl.Boolean)
-    )
+    df = _y_true_y_pred_to_df(y_true, y_pred)
 
     return ConfusionMatrix(*_confusion_matrix(df))
 
 
 def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
-    df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
-        pl.col("y_true").cast(pl.Boolean)
-    )
+    df = _y_true_y_score_to_df(y_true, y_score)
 
     return _roc_auc(df)
 
 
 def max_ks(y_true: ArrayLike, y_score: ArrayLike) -> float:
-    df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
-        pl.col("y_true").cast(pl.Boolean)
-    )
+    df = _y_true_y_score_to_df(y_true, y_score)
 
     return _max_ks(df)
+
+
+def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    df = _y_true_y_score_to_df(y_true, y_score)
+
+    return _brier_loss(df)

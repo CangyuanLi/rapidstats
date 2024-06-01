@@ -139,3 +139,11 @@ def test_max_ks(y_true, y_score):
     fs = rapidstats.max_ks(y_true, y_score)
 
     pytest.approx(fs) == ref
+
+
+@pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
+def test_brier_loss(y_true, y_score):
+    ref = sklearn.metrics.brier_score_loss(y_true, y_score)
+    res = rapidstats.brier_loss(y_true, y_score)
+
+    pytest.approx(res) == ref

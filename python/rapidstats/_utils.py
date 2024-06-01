@@ -2,7 +2,21 @@ import concurrent.futures
 import multiprocessing
 from typing import Literal, Union
 
+import polars as pl
 import tqdm
+from polars.series.series import ArrayLike
+
+
+def _y_true_y_score_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
+    return pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
+        pl.col("y_true").cast(pl.Boolean)
+    )
+
+
+def _y_true_y_pred_to_df(y_true: ArrayLike, y_pred: ArrayLike) -> pl.DataFrame:
+    return pl.DataFrame({"y_true": y_true, "y_pred": y_pred}).with_columns(
+        pl.col("y_true", "y_pred").cast(pl.Boolean)
+    )
 
 
 def _run_concurrent(

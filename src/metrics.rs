@@ -267,3 +267,14 @@ pub fn max_ks(df: DataFrame) -> f64 {
             .unwrap(),
     )
 }
+
+pub fn brier_loss(df: DataFrame) -> f64 {
+    df.lazy()
+        .with_column((col("y_true") - col("y_score")).pow(2).alias("x"))
+        .collect()
+        .unwrap()
+        .column("x")
+        .unwrap()
+        .mean()
+        .unwrap()
+}

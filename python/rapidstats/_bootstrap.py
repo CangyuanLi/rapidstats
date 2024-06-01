@@ -8,11 +8,12 @@ import scipy.stats
 from polars.series.series import ArrayLike
 
 from ._rustystats import (
+    _bootstrap_brier_loss,
     _bootstrap_confusion_matrix,
     _bootstrap_max_ks,
     _bootstrap_roc_auc,
 )
-from ._utils import _run_concurrent
+from ._utils import _run_concurrent, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
 ConfidenceInterval = tuple[float, float, float]
 
@@ -119,24 +120,23 @@ class Bootstrap:
         y_true: ArrayLike,
         y_pred: ArrayLike,
     ) -> BootstrappedConfusionMatrix:
-        df = pl.DataFrame({"y_true": y_true, "y_pred": y_pred}).with_columns(
-            pl.col("y_true", "y_pred").cast(pl.Boolean)
-        )
+        df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(df, self.iterations, self.z, self.seed)
         )
 
     def roc_auc(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
-        df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
-            pl.col("y_true").cast(pl.Boolean)
-        )
+        df = _y_true_y_score_to_df(y_true, y_score)
 
         return _bootstrap_roc_auc(df, self.iterations, self.z, self.seed)
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
-        df = pl.DataFrame({"y_true": y_true, "y_score": y_score}).with_columns(
-            pl.col("y_true").cast(pl.Boolean)
-        )
+        df = _y_true_y_score_to_df(y_true, y_score)
 
         return _bootstrap_max_ks(df, self.iterations, self.z, self.seed)
+
+    def brier_loss(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        df = _y_true_y_score_to_df(y_true, y_score)
+
+        return _bootstrap_brier_loss(df, self.iterations, self.z, self.seed)
