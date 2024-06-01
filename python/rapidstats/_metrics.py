@@ -37,16 +37,7 @@ class ConfusionMatrix:
     def to_polars(self) -> pl.DataFrame:
         dct = self.__dict__
 
-        return (
-            pl.DataFrame({"metric": dct.keys(), "value": dct.values()})
-            .fill_nan(None)
-            .with_columns(
-                pl.when(pl.col("value").is_infinite())
-                .then(None)
-                .otherwise(pl.col("value"))
-                .alias("value")
-            )
-        )
+        return pl.DataFrame({"metric": dct.keys(), "value": dct.values()})
 
 
 def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:

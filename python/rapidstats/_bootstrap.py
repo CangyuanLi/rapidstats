@@ -55,23 +55,13 @@ class BootstrappedConfusionMatrix:
             mean.append(m)
             upper.append(u)
 
-        return (
-            pl.DataFrame(
-                {
-                    "metric": dct.keys(),
-                    "lower": lower,
-                    "mean": mean,
-                    "upper": upper,
-                }
-            )
-            .fill_nan(None)
-            .with_columns(
-                pl.when(pl.col(c).is_infinite())
-                .then(None)
-                .otherwise(pl.col(c))
-                .alias(c)
-                for c in ["lower", "mean", "upper"]
-            )
+        return pl.DataFrame(
+            {
+                "metric": dct.keys(),
+                "lower": lower,
+                "mean": mean,
+                "upper": upper,
+            }
         )
 
 
