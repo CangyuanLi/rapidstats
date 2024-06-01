@@ -40,13 +40,15 @@ def reference_confusion_matrix(y_true, y_pred):
         y_true, y_pred, labels=[False, True]
     ).ravel()
 
-    p = tn + fn_
+    p = tp + fn_
     n = fp + tn
     tpr = tp / p
     fnr = 1.0 - tpr
     fpr = fp / n
     tnr = 1.0 - fpr
-    precision = tp / (tp + fp)
+    precision = sklearn.metrics.precision_score(
+        y_true, y_pred, labels=[False, True], zero_division=np.nan
+    )
     false_omission_rate = fn_ / (fn_ + tn)
     plr = tpr / fpr
     nlr = fnr / tnr
@@ -57,41 +59,44 @@ def reference_confusion_matrix(y_true, y_pred):
     prevalence_threshold = (np.sqrt(tpr * fpr) - fpr) / (tpr - fpr)
     markedness = precision - false_omission_rate
     dor = plr / nlr
-    balanced_accuracy = (tpr + tnr) / 2.0
-    f1 = (2.0 * precision * tpr) / (precision + tpr)
-    folkes_mallows_index = np.sqrt(precision * tpr)
-    mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
-        fnr * fpr * false_omission_rate * fdr
-    )
-    acc = (tp + tn) / (p + n)
+    balanced_accuracy = sklearn.metrics.balanced_accuracy_score(y_true, y_pred)
+    f1 = sklearn.metrics.f1_score(y_true, y_pred, zero_division=np.nan)
+    folkes_mallows_index = sklearn.metrics.fowlkes_mallows_score(y_true, y_pred)
+    mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
+    acc = sklearn.metrics.accuracy_score(y_true, y_pred)
     threat_score = tp / (tp + fn_ + fp)
 
     return ConfusionMatrix(
-        tn,
-        fp,
-        fn_,
-        tp,
-        tpr,
-        fpr,
-        fnr,
-        tnr,
-        prevalence,
-        prevalence_threshold,
-        informedness,
-        precision,
-        false_omission_rate,
-        plr,
-        nlr,
-        acc,
-        balanced_accuracy,
-        f1,
-        folkes_mallows_index,
-        mcc,
-        threat_score,
-        markedness,
-        fdr,
-        npv,
-        dor,
+        *[
+            float("nan") if np.isinf(x) else x
+            for x in [
+                tn,
+                fp,
+                fn_,
+                tp,
+                tpr,
+                fpr,
+                fnr,
+                tnr,
+                prevalence,
+                prevalence_threshold,
+                informedness,
+                precision,
+                false_omission_rate,
+                plr,
+                nlr,
+                acc,
+                balanced_accuracy,
+                f1,
+                folkes_mallows_index,
+                mcc,
+                threat_score,
+                markedness,
+                fdr,
+                npv,
+                dor,
+            ]
+        ]
     )
 
 
