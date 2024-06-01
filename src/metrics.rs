@@ -53,7 +53,7 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
     let fn_ = s[2];
     let tp = s[3];
 
-    let p = tn + fn_;
+    let p = tp + fn_;
     let n = fp + tn;
     let tpr = tp / p;
     let fnr = 1.0 - tpr;
@@ -104,6 +104,7 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
         npv,
         dor,
     ]
+    .map(|x| if x.is_infinite() { f64::NAN } else { x })
 }
 
 pub fn bootstrap_confusion_matrix(
