@@ -171,6 +171,9 @@ fn trapz(y: ArrayView1<f64>, x: ArrayView1<f64>) -> f64 {
 
 pub fn roc_auc(df: DataFrame) -> f64 {
     let positive_counts = df["y_true"].sum::<u32>().unwrap_or(0);
+    if positive_counts == 0 {
+        return f64::NAN;
+    }
     let n = df.height() as u32;
 
     let mut binding = df
