@@ -150,8 +150,8 @@ def test_brier_loss(y_true, y_score):
 
 
 @pytest.mark.parametrize("y_true", [Y_TRUE, Y_TRUE_SC])
-def test_positive_ratio(y_true):
-    ref = y_true.sum() / y_true.shape[0]
-    res = rapidstats.positive_ratio(y_true)
+def test_mean(y_true):
+    ref = y_true.mean()
+    res = rapidstats.mean(y_true)
 
     pytest.approx(res) == ref
