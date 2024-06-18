@@ -143,6 +143,6 @@ class Bootstrap:
         return _bootstrap_brier_loss(df, self.iterations, self.z, self.seed)
 
     def mean(self, y: ArrayLike) -> ConfidenceInterval:
-        df = pl.DataFrame({"y": y}).drop_nulls()
+        df = pl.DataFrame({"y": y})
 
         return _bootstrap_mean(df, self.iterations, self.z, self.seed)

@@ -66,4 +66,4 @@ def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
 
 
 def mean(y: ArrayLike) -> float:
-    return _mean(pl.DataFrame({"y": y}).drop_nulls())
+    return _mean(pl.DataFrame({"y": y}))
