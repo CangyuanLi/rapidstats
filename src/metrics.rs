@@ -1,5 +1,5 @@
 use crate::bootstrap;
-use ndarray::{s, ArrayView1};
+use ndarray::{s, ArrayView1, Data};
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
@@ -280,4 +280,8 @@ pub fn brier_loss(df: DataFrame) -> f64 {
         .unwrap()
         .mean()
         .unwrap()
+}
+
+pub fn positive_ratio(df: DataFrame) -> f64 {
+    df["y"].sum::<f64>().unwrap_or(f64::NAN) / df["y"].len() as f64
 }

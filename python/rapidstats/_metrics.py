@@ -3,7 +3,13 @@ import dataclasses
 import polars as pl
 from polars.series.series import ArrayLike
 
-from ._rustystats import _brier_loss, _confusion_matrix, _max_ks, _roc_auc
+from ._rustystats import (
+    _brier_loss,
+    _confusion_matrix,
+    _max_ks,
+    _positive_ratio,
+    _roc_auc,
+)
 from ._utils import _y_true_y_pred_to_df, _y_true_y_score_to_df
 
 
@@ -63,3 +69,7 @@ def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
     df = _y_true_y_score_to_df(y_true, y_score)
 
     return _brier_loss(df)
+
+
+def positive_ratio(y: ArrayLike) -> float:
+    return _positive_ratio(pl.DataFrame({"y": y}).drop_nulls())

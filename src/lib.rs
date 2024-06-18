@@ -79,6 +79,24 @@ fn _bootstrap_brier_loss(
     ))
 }
 
+#[pyfunction]
+fn _positive_ratio(df: PyDataFrame) -> PyResult<f64> {
+    Ok(metrics::positive_ratio(df.into()))
+}
+
+#[pyfunction]
+fn _bootstrap_positive_ratio(
+    df: PyDataFrame,
+    iterations: u64,
+    z: f64,
+    seed: Option<u64>,
+) -> PyResult<(f64, f64, f64)> {
+    Ok(bootstrap::confidence_interval(
+        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::positive_ratio),
+        z,
+    ))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -90,6 +108,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_max_ks, m)?)?;
     m.add_function(wrap_pyfunction!(_brier_loss, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_brier_loss, m)?)?;
+    m.add_function(wrap_pyfunction!(_positive_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(_bootstrap_positive_ratio, m)?)?;
 
     Ok(())
 }
