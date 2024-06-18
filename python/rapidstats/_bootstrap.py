@@ -11,7 +11,7 @@ from ._rustystats import (
     _bootstrap_brier_loss,
     _bootstrap_confusion_matrix,
     _bootstrap_max_ks,
-    _bootstrap_positive_ratio,
+    _bootstrap_mean,
     _bootstrap_roc_auc,
 )
 from ._utils import _run_concurrent, _y_true_y_pred_to_df, _y_true_y_score_to_df
@@ -142,7 +142,7 @@ class Bootstrap:
 
         return _bootstrap_brier_loss(df, self.iterations, self.z, self.seed)
 
-    def positive_ratio(self, y: ArrayLike) -> ConfidenceInterval:
+    def mean(self, y: ArrayLike) -> ConfidenceInterval:
         df = pl.DataFrame({"y": y}).drop_nulls()
 
-        return _bootstrap_positive_ratio(df, self.iterations, self.z, self.seed)
+        return _bootstrap_mean(df, self.iterations, self.z, self.seed)

@@ -282,6 +282,6 @@ pub fn brier_loss(df: DataFrame) -> f64 {
         .unwrap()
 }
 
-pub fn positive_ratio(df: DataFrame) -> f64 {
-    df["y"].sum::<f64>().unwrap_or(f64::NAN) / df["y"].len() as f64
+pub fn mean(df: DataFrame) -> f64 {
+    df["y"].mean().unwrap_or(f64::NAN)
 }

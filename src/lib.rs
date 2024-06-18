@@ -80,19 +80,19 @@ fn _bootstrap_brier_loss(
 }
 
 #[pyfunction]
-fn _positive_ratio(df: PyDataFrame) -> PyResult<f64> {
-    Ok(metrics::positive_ratio(df.into()))
+fn _mean(df: PyDataFrame) -> PyResult<f64> {
+    Ok(metrics::mean(df.into()))
 }
 
 #[pyfunction]
-fn _bootstrap_positive_ratio(
+fn _bootstrap_mean(
     df: PyDataFrame,
     iterations: u64,
     z: f64,
     seed: Option<u64>,
 ) -> PyResult<(f64, f64, f64)> {
     Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::positive_ratio),
+        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::mean),
         z,
     ))
 }
@@ -108,8 +108,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_max_ks, m)?)?;
     m.add_function(wrap_pyfunction!(_brier_loss, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_brier_loss, m)?)?;
-    m.add_function(wrap_pyfunction!(_positive_ratio, m)?)?;
-    m.add_function(wrap_pyfunction!(_bootstrap_positive_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(_bootstrap_mean, m)?)?;
 
     Ok(())
 }
