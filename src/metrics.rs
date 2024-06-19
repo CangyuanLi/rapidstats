@@ -279,9 +279,19 @@ pub fn brier_loss(df: DataFrame) -> f64 {
         .column("x")
         .unwrap()
         .mean()
-        .unwrap()
+        .unwrap_or(f64::NAN)
 }
 
 pub fn mean(df: DataFrame) -> f64 {
     df["y"].mean().unwrap_or(f64::NAN)
+}
+
+pub fn adverse_impact_ratio(df: DataFrame) -> f64 {
+    let is_protected = df["protected"].bool().unwrap();
+    let is_control = df["control"].bool().unwrap();
+    let y_pred = df["y_pred"].bool().unwrap();
+    let protected = y_pred.filter(is_protected).unwrap();
+    let control = y_pred.filter(is_control).unwrap();
+
+    protected.mean().unwrap_or(f64::NAN) / control.mean().unwrap_or(f64::NAN)
 }

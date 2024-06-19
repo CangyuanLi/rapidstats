@@ -8,6 +8,7 @@ import scipy.stats
 from polars.series.series import ArrayLike
 
 from ._rustystats import (
+    _bootstrap_adverse_impact_ratio,
     _bootstrap_brier_loss,
     _bootstrap_confusion_matrix,
     _bootstrap_max_ks,
@@ -146,3 +147,17 @@ class Bootstrap:
         df = pl.DataFrame({"y": y})
 
         return _bootstrap_mean(df, self.iterations, self.z, self.seed)
+
+    def adverse_impact_ratio(
+        self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
+    ):
+        df = pl.DataFrame(
+            {"y_pred": y_pred, "protected": protected, "control": control}
+        ).cast(pl.Boolean)
+
+        return _bootstrap_adverse_impact_ratio(
+            df,
+            self.iterations,
+            self.z,
+            self.seed,
+        )

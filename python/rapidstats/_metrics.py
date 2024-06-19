@@ -1,10 +1,18 @@
 import dataclasses
+from typing import Optional
 
 import polars as pl
 from polars.series.series import ArrayLike
 
-from ._rustystats import _brier_loss, _confusion_matrix, _max_ks, _mean, _roc_auc
-from ._utils import _y_true_y_pred_to_df, _y_true_y_score_to_df
+from ._rustystats import (
+    _adverse_impact_ratio,
+    _brier_loss,
+    _confusion_matrix,
+    _max_ks,
+    _mean,
+    _roc_auc,
+)
+from ._utils import DataFrame, _to_polars, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
 
 @dataclasses.dataclass
@@ -67,3 +75,15 @@ def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
 
 def mean(y: ArrayLike) -> float:
     return _mean(pl.DataFrame({"y": y}))
+
+
+def adverse_impact_ratio(
+    y_pred: ArrayLike,
+    protected: ArrayLike,
+    control: ArrayLike,
+) -> float:
+    return _adverse_impact_ratio(
+        pl.DataFrame(
+            {"y_pred": y_pred, "protected": protected, "control": control}
+        ).cast(pl.Boolean)
+    )
