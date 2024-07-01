@@ -248,7 +248,11 @@ fn ks_2samp(v1: &[f64], v2: &[f64]) -> f64 {
         })
         .fold(f64::MIN, |acc, (x, y)| acc.max((x - y).abs()));
 
-    stats
+    if stats.is_infinite() {
+        f64::NAN
+    } else {
+        stats
+    }
 }
 
 pub fn max_ks(df: DataFrame) -> f64 {
