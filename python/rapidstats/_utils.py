@@ -22,7 +22,9 @@ def _to_polars(df: DataFrame) -> pl.DataFrame:
 def _y_true_y_score_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
     return (
         pl.DataFrame({"y_true": y_true, "y_score": y_score})
-        .with_columns(pl.col("y_true").cast(pl.Boolean))
+        .with_columns(
+            pl.col("y_true").cast(pl.Boolean), pl.col("y_score").cast(pl.Float64)
+        )
         .drop_nulls()
     )
 
