@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3_polars::PyDataFrame;
 
 mod bootstrap;
+mod distributions;
 mod metrics;
 
 #[pyfunction]
@@ -115,6 +116,11 @@ fn _bootstrap_adverse_impact_ratio(
     ))
 }
 
+#[pyfunction]
+fn _norm_ppf(q: f64) -> PyResult<f64> {
+    Ok(distributions::norm_ppf(q))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -130,6 +136,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_mean, m)?)?;
     m.add_function(wrap_pyfunction!(_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_adverse_impact_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
 
     Ok(())
 }

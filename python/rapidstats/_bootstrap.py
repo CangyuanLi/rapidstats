@@ -1,12 +1,13 @@
 import dataclasses
 import functools
+import math
+import statistics
 from typing import Optional
 
-import numpy as np
 import polars as pl
-import scipy.stats
 from polars.series.series import ArrayLike
 
+from ._distributions import norm
 from ._rustystats import (
     _bootstrap_adverse_impact_ratio,
     _bootstrap_brier_loss,
@@ -72,36 +73,6 @@ def _x(i, data, stat_func):
     return stat_func(data.sample(fraction=1, with_replacement=True, seed=i))
 
 
-def bootstrap(
-    data: pl.DataFrame,
-    stat_func,
-    iterations: int = 1_000,
-    confidence: float = 0.95,
-    seed: int = None,
-    **kwargs,
-) -> ConfidenceInterval:
-    default = {"executor": "threads", "preserve_order": False}
-    for k, v in default.items():
-        if k not in kwargs:
-            kwargs[k] = v
-
-    func = functools.partial(_x, data=data, stat_func=stat_func)
-
-    if seed is None:
-        iterable = (None for _ in range(iterations))
-    else:
-        iterable = (seed + i for i in range(iterations))
-
-    runs = np.array(_run_concurrent(func, iterable, **kwargs))
-    z = scipy.stats.norm.ppf(confidence)
-
-    mean = np.nanmean(runs)
-    std = np.nanstd(runs)
-    x = z * std / iterations ** (1 / 2)
-
-    return (mean - x, mean, mean + x)
-
-
 class Bootstrap:
     def __init__(
         self,
@@ -111,11 +82,34 @@ class Bootstrap:
     ) -> None:
         self.iterations = iterations
         self.confidence = confidence
-        self.z = scipy.stats.norm.ppf(confidence)
+        self.z = norm.ppf(confidence)
         self.seed = seed
 
-    def run(self, data, stat_func) -> ConfidenceInterval:
-        return bootstrap(data, stat_func, self.iterations, self.confidence, self.seed)
+    def run(self, data, stat_func, **kwargs) -> ConfidenceInterval:
+        default = {"executor": "threads", "preserve_order": False}
+        for k, v in default.items():
+            if k not in kwargs:
+                kwargs[k] = v
+
+        func = functools.partial(_x, data=data, stat_func=stat_func)
+
+        if self.seed is None:
+            iterable = (None for _ in range(self.iterations))
+        else:
+            iterable = (self.seed + i for i in range(self.iterations))
+
+        runs = [
+            x for x in _run_concurrent(func, iterable, **kwargs) if not math.isnan(x)
+        ]
+
+        if len(runs) == 0:
+            return (math.nan, math.nan, math.nan)
+
+        mean = statistics.fmean(runs)
+        std = statistics.stdev(runs)
+        x = self.z * std / self.iterations ** (1 / 2)
+
+        return (mean - x, mean, mean + x)
 
     def confusion_matrix(
         self,
