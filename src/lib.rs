@@ -97,6 +97,11 @@ fn _norm_ppf(q: f64) -> PyResult<f64> {
     Ok(distributions::norm_ppf(q))
 }
 
+#[pyfunction]
+fn _norm_cdf(x: f64) -> PyResult<f64> {
+    Ok(distributions::norm_cdf(x))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -113,6 +118,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
+    m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
 
     Ok(())
 }
