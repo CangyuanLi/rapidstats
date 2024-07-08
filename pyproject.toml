@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = ["polars>=0.20.13", "tqdm", "pyarrow>=7.0.0"]
+dependencies = ["polars>=0.20.13", "tqdm"]
 
 [project.urls]
 "Homepage" = "https://github.com/CangyuanLi/rapidstats"
