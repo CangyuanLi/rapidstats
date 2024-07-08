@@ -1,6 +1,81 @@
 use polars::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
+use crate::distributions;
+
+pub type ConfidenceInterval = (f64, f64, f64);
+
+// The resulting bootstrap vectors are small vectors, usually around 500-10_000 in
+// length, so let's just operate on these vectors directly instead of converting into
+// ndarray or ChunkedArray
+trait VecUtils {
+    fn mean(&self) -> f64;
+    fn std(&self) -> f64;
+    fn drop_nans(&self) -> Vec<f64>;
+    fn percentile(&self, q: f64) -> f64;
+}
+
+impl VecUtils for Vec<f64> {
+    #[allow(clippy::manual_range_contains)]
+    fn percentile(&self, q: f64) -> f64 {
+        if self.is_empty() {
+            return f64::NAN;
+        }
+
+        if q < 0.0 || q > 100.0 {
+            panic!("Percentile must be between 0 and 100");
+        }
+
+        let mut sorted_data = self.clone();
+        sorted_data.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+
+        if q == 0.0 {
+            return sorted_data[0];
+        }
+        if q == 100.0 {
+            return sorted_data[sorted_data.len() - 1];
+        }
+
+        let rank = (q / 100.0) * (sorted_data.len() - 1) as f64;
+        let lower_index = rank.floor() as usize;
+        let upper_index = rank.ceil() as usize;
+
+        if lower_index == upper_index {
+            sorted_data[lower_index]
+        } else {
+            let lower_value = sorted_data[lower_index];
+            let upper_value = sorted_data[upper_index];
+            let fraction = rank - lower_index as f64;
+
+            lower_value + (upper_value - lower_value) * fraction
+        }
+    }
+
+    fn drop_nans(&self) -> Vec<f64> {
+        // copied is a no-op for f64
+        self.iter().copied().filter(|x| !x.is_nan()).collect()
+    }
+
+    fn mean(&self) -> f64 {
+        if self.is_empty() {
+            return f64::NAN;
+        }
+
+        self.iter().sum::<f64>() / self.len() as f64
+    }
+
+    fn std(&self) -> f64 {
+        if self.len() < 2 {
+            return f64::NAN;
+        }
+        let mean = self.mean();
+        let variance =
+            self.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (self.len() - 1) as f64;
+
+        variance.sqrt()
+    }
+}
+
 pub fn run_bootstrap<T: Send + Sync>(
     df: DataFrame,
     iterations: u64,
@@ -9,7 +84,7 @@ pub fn run_bootstrap<T: Send + Sync>(
 ) -> Vec<T> {
     let df_height = df.height();
 
-    let runs: Vec<T> = (0..iterations)
+    let bootstrap_stats: Vec<T> = (0..iterations)
         .into_par_iter()
         .map(|i| {
             func(
@@ -19,16 +94,69 @@ pub fn run_bootstrap<T: Send + Sync>(
         })
         .collect();
 
-    runs
+    bootstrap_stats
 }
 
-pub fn confidence_interval(runs: Vec<f64>, z: f64) -> (f64, f64, f64) {
+pub fn run_jacknife<T: Send + Sync>(df: DataFrame, func: fn(DataFrame) -> T) -> Vec<T> {
+    let df_height = df.height();
+    let index = ChunkedArray::new("index", 0..df_height as u64);
+    let jacknife_stats: Vec<T> = (0..df_height)
+        .into_par_iter()
+        .map(|i| func(df.filter(&index.not_equal(i)).unwrap()))
+        .collect();
+
+    jacknife_stats
+}
+
+pub fn confidence_interval(bootstrap_stats: Vec<f64>, z: f64) -> ConfidenceInterval {
+    let runs = bootstrap_stats.drop_nans();
     let iterations = runs.len() as f64;
-    let s = ChunkedArray::new("x", runs);
-    let s = s.filter(&s.is_not_nan()).unwrap();
-    let std = s.std(0).unwrap_or(f64::NAN);
-    let mean = s.mean().unwrap_or(f64::NAN);
+    let std = runs.std();
+    let mean = runs.mean();
     let x = z * std / iterations.sqrt();
 
     (mean - x, mean, mean + x)
+}
+
+pub fn bca_confidence_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    jacknife_stats: Vec<f64>,
+    z: (f64, f64),
+) -> ConfidenceInterval {
+    let bootstrap_stats = bootstrap_stats.drop_nans();
+    let jacknife_stats = jacknife_stats.drop_nans();
+    let z1 = z.0;
+    let z2 = z.1;
+
+    let bias_correction_factor = distributions::norm_ppf(
+        bootstrap_stats
+            .iter()
+            .filter(|&x| x < &original_stat)
+            .count() as f64
+            / bootstrap_stats.len() as f64,
+    );
+
+    let jacknife_mean = jacknife_stats.mean();
+    let diff: Vec<f64> = jacknife_stats.iter().map(|x| jacknife_mean - x).collect();
+
+    let acceleration_factor = (diff.iter().map(|x| x.powi(3)).sum::<f64>())
+        / (6.0 * diff.iter().map(|x| x.powi(2)).sum::<f64>().powf(1.5));
+
+    let lower_p = distributions::norm_cdf(
+        bias_correction_factor
+            + (bias_correction_factor + z1)
+                / (1.0 - acceleration_factor * (bias_correction_factor + z1)),
+    );
+    let upper_p = distributions::norm_cdf(
+        bias_correction_factor
+            + (bias_correction_factor + z2)
+                / (1.0 - acceleration_factor * (bias_correction_factor + z2)),
+    );
+
+    (
+        bootstrap_stats.percentile(lower_p * 100.0),
+        bootstrap_stats.mean(),
+        bootstrap_stats.percentile(upper_p * 100.0),
+    )
 }

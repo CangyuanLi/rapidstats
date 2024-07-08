@@ -1,5 +1,5 @@
 use crate::bootstrap;
-use ndarray::{s, ArrayView1, Data};
+use ndarray::{s, ArrayView1};
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
@@ -107,57 +107,48 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
     .map(|x| if x.is_infinite() { f64::NAN } else { x })
 }
 
+fn transpose_confusion_matrix_results(results: Vec<[f64; 25]>) -> [Vec<f64>; 25] {
+    let mut transposed: [Vec<f64>; 25] = Default::default();
+    for arr in results {
+        for (i, v) in arr.into_iter().enumerate() {
+            transposed[i].push(v);
+        }
+    }
+
+    transposed
+}
+
 pub fn bootstrap_confusion_matrix(
     df: DataFrame,
     iterations: u64,
-    z: f64,
+    z: (f64, f64),
     seed: Option<u64>,
-) -> Vec<(f64, f64, f64)> {
+) -> Vec<bootstrap::ConfidenceInterval> {
     let base_cm = base_confusion_matrix(df);
 
-    let runs = bootstrap::run_bootstrap(base_cm, iterations, seed, confusion_matrix);
+    let bootstrap_stats =
+        bootstrap::run_bootstrap(base_cm.clone(), iterations, seed, confusion_matrix);
+    let bs_transposed = transpose_confusion_matrix_results(bootstrap_stats);
 
-    let bs_df = DataFrame::new(vec![
-        Series::from_vec(
-            "stat",
-            (0..25)
-                .cycle()
-                .take((iterations * 25) as usize)
-                .collect::<Vec<u64>>(),
-        ),
-        Series::from_vec("val", runs.concat()),
-    ])
-    .unwrap()
-    .lazy()
-    .fill_nan(lit(NULL))
-    .group_by_stable(["stat"])
-    .agg([
-        col("val").mean().alias("mean"),
-        col("val").std(0).alias("std"),
-    ])
-    .drop(["stat"])
-    .with_column((lit(z) * (col("std") / lit((iterations as f64).sqrt()))).alias("val"))
-    .with_columns([
-        (col("mean") - col("val")).alias("lower"),
-        (col("mean") + col("val")).alias("upper"),
-    ])
-    .collect()
-    .unwrap();
+    if z.1.is_nan() {
+        bs_transposed
+            .into_iter()
+            .map(|bs| bootstrap::confidence_interval(bs, z.0))
+            .collect::<Vec<bootstrap::ConfidenceInterval>>()
+    } else {
+        let original_stats = confusion_matrix(base_cm.clone());
+        let jacknife_stats = bootstrap::run_jacknife(base_cm, confusion_matrix);
+        let js_transposed = transpose_confusion_matrix_results(jacknife_stats);
 
-    bs_df["lower"]
-        .f64()
-        .unwrap()
-        .iter()
-        .zip(bs_df["mean"].f64().unwrap().iter())
-        .zip(bs_df["upper"].f64().unwrap().iter())
-        .map(|((x, y), z)| {
-            (
-                x.unwrap_or(f64::NAN),
-                y.unwrap_or(f64::NAN),
-                z.unwrap_or(f64::NAN),
-            )
-        })
-        .collect()
+        original_stats
+            .into_iter()
+            .zip(bs_transposed)
+            .zip(js_transposed)
+            .map(|((original_stat, bs), js)| {
+                bootstrap::bca_confidence_interval(original_stat, bs, js, z)
+            })
+            .collect::<Vec<bootstrap::ConfidenceInterval>>()
+    }
 }
 
 // AUC code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/num/tp_fp.rs

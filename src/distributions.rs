@@ -1,3 +1,5 @@
+use std::f64::consts::SQRT_2;
+
 pub fn norm_ppf(q: f64) -> f64 {
     // Coefficients for the rational approximation
     const A1: f64 = -39.6968302866538;
@@ -45,4 +47,28 @@ pub fn norm_ppf(q: f64) -> f64 {
 
     -(((((C1 * q + C2) * q + C3) * q + C4) * q + C5) * q + C6)
         / ((((D1 * q + D2) * q + D3) * q + D4) * q + 1.0)
+}
+
+fn erf(x: f64) -> f64 {
+    // Constants
+    let a1 = 0.254829592;
+    let a2 = -0.284496736;
+    let a3 = 1.421413741;
+    let a4 = -1.453152027;
+    let a5 = 1.061405429;
+    let p = 0.3275911;
+
+    // Save the sign of x
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+
+    // A&S formula 7.1.26
+    let t = 1.0 / (1.0 + p * x);
+    let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+
+    sign * y
+}
+
+pub fn norm_cdf(x: f64) -> f64 {
+    0.5 * (1.0 + erf(x / SQRT_2))
 }

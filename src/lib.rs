@@ -6,6 +6,34 @@ mod bootstrap;
 mod distributions;
 mod metrics;
 
+macro_rules! generate_bootstrap_function {
+    ($func_name:ident, $metric_func:path) => {
+        #[pyfunction]
+        fn $func_name(
+            df: PyDataFrame,
+            iterations: u64,
+            z: (f64, f64),
+            seed: Option<u64>,
+        ) -> PyResult<bootstrap::ConfidenceInterval> {
+            let df: DataFrame = df.into();
+            let bootstrap_stats =
+                bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
+            if z.1.is_nan() {
+                Ok(bootstrap::confidence_interval(bootstrap_stats, z.0))
+            } else {
+                let original_stat = $metric_func(df.clone());
+                let jacknife_stats = bootstrap::run_jacknife(df, $metric_func);
+                Ok(bootstrap::bca_confidence_interval(
+                    original_stat,
+                    bootstrap_stats,
+                    jacknife_stats,
+                    z,
+                ))
+            }
+        }
+    };
+}
+
 #[pyfunction]
 fn _confusion_matrix(df: PyDataFrame) -> PyResult<metrics::ConfusionMatrixArray> {
     let df: DataFrame = df.into();
@@ -18,9 +46,9 @@ fn _confusion_matrix(df: PyDataFrame) -> PyResult<metrics::ConfusionMatrixArray>
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
     iterations: u64,
-    z: f64,
+    z: (f64, f64),
     seed: Option<u64>,
-) -> PyResult<Vec<(f64, f64, f64)>> {
+) -> PyResult<Vec<bootstrap::ConfidenceInterval>> {
     let df: DataFrame = df.into();
 
     Ok(metrics::bootstrap_confusion_matrix(df, iterations, z, seed))
@@ -31,90 +59,38 @@ fn _roc_auc(df: PyDataFrame) -> PyResult<f64> {
     Ok(metrics::roc_auc(df.into()))
 }
 
-#[pyfunction]
-fn _bootstrap_roc_auc(
-    df: PyDataFrame,
-    iterations: u64,
-    z: f64,
-    seed: Option<u64>,
-) -> PyResult<(f64, f64, f64)> {
-    Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::roc_auc),
-        z,
-    ))
-}
+generate_bootstrap_function!(_bootstrap_roc_auc, metrics::roc_auc);
 
 #[pyfunction]
 fn _max_ks(df: PyDataFrame) -> PyResult<f64> {
     Ok(metrics::max_ks(df.into()))
 }
 
-#[pyfunction]
-fn _bootstrap_max_ks(
-    df: PyDataFrame,
-    iterations: u64,
-    z: f64,
-    seed: Option<u64>,
-) -> PyResult<(f64, f64, f64)> {
-    Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::max_ks),
-        z,
-    ))
-}
+generate_bootstrap_function!(_bootstrap_max_ks, metrics::max_ks);
 
 #[pyfunction]
 fn _brier_loss(df: PyDataFrame) -> PyResult<f64> {
     Ok(metrics::brier_loss(df.into()))
 }
 
-#[pyfunction]
-fn _bootstrap_brier_loss(
-    df: PyDataFrame,
-    iterations: u64,
-    z: f64,
-    seed: Option<u64>,
-) -> PyResult<(f64, f64, f64)> {
-    Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::brier_loss),
-        z,
-    ))
-}
+generate_bootstrap_function!(_bootstrap_brier_loss, metrics::brier_loss);
 
 #[pyfunction]
 fn _mean(df: PyDataFrame) -> PyResult<f64> {
     Ok(metrics::mean(df.into()))
 }
 
-#[pyfunction]
-fn _bootstrap_mean(
-    df: PyDataFrame,
-    iterations: u64,
-    z: f64,
-    seed: Option<u64>,
-) -> PyResult<(f64, f64, f64)> {
-    Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::mean),
-        z,
-    ))
-}
+generate_bootstrap_function!(_bootstrap_mean, metrics::mean);
 
 #[pyfunction]
 fn _adverse_impact_ratio(df: PyDataFrame) -> PyResult<f64> {
     Ok(metrics::adverse_impact_ratio(df.into()))
 }
 
-#[pyfunction]
-fn _bootstrap_adverse_impact_ratio(
-    df: PyDataFrame,
-    iterations: u64,
-    z: f64,
-    seed: Option<u64>,
-) -> PyResult<(f64, f64, f64)> {
-    Ok(bootstrap::confidence_interval(
-        bootstrap::run_bootstrap(df.into(), iterations, seed, metrics::adverse_impact_ratio),
-        z,
-    ))
-}
+generate_bootstrap_function!(
+    _bootstrap_adverse_impact_ratio,
+    metrics::adverse_impact_ratio
+);
 
 #[pyfunction]
 fn _norm_ppf(q: f64) -> PyResult<f64> {
