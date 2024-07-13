@@ -25,3 +25,7 @@ plugins:
         options:
           summary: true
           docstring_style: numpy
+
+extra:
+  version:
+    provider: mike

@@ -33,6 +33,12 @@ def main():
         ["gh", "release", "create", f"v{version}", "--generate-notes"], check=True
     )
 
+    print("compiling docs")
+    subprocess.run(
+        ["mike", "deploy", "--push", "--update-aliases", f"{version}", "latest"]
+    )
+    subprocess.run(["mike", "set-default", "--push", "latest"])
+
 
 if __name__ == "__main__":
     main()
