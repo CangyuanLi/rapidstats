@@ -37,7 +37,7 @@ macro_rules! generate_bootstrap_function {
                 ))
             } else {
                 Err(PyValueError::new_err(format!(
-                    "Invalid confidence interval method `{}`, only `percentile` and `BCa` are supported",
+                    "Invalid confidence interval method `{}`, only `percentile`, `basic`, and `BCa` are supported",
                     method
                 )))
             }
