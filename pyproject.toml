@@ -29,10 +29,6 @@ module-name = "rapidstats._rustystats"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.mypy]
-mypy_path = "src"
-ignore_missing_imports = true
-
 [tool.isort]
 profile = "black"
 
