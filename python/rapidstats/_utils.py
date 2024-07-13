@@ -13,7 +13,9 @@ DataFrame = Union[pl.DataFrame, SupportsInterchange]
 def _to_polars(df: DataFrame) -> pl.DataFrame:
     if isinstance(df, pl.DataFrame):
         return df
-    elif hasattr("__dataframe__"):
+    elif hasattr(df, "to_polars"):
+        return df.to_polars()
+    elif hasattr(df, "__dataframe__"):
         return pl.from_dataframe(df)
     else:
         raise ValueError("Input must be convertible to a Polars DataFrame")
@@ -44,7 +46,7 @@ def _run_concurrent(
         Literal["threads", "processes"],
         concurrent.futures.ThreadPoolExecutor,
         concurrent.futures.ProcessPoolExecutor,
-    ],
+    ] = "threads",
     preserve_order: bool = False,
     quiet: bool = False,
     **executor_kwargs,

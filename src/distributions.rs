@@ -1,6 +1,14 @@
 use std::f64::consts::SQRT_2;
 
 pub fn norm_ppf(q: f64) -> f64 {
+    if q == 0.0 {
+        return f64::NEG_INFINITY;
+    }
+
+    if q == 1.0 {
+        return f64::INFINITY;
+    }
+
     // Coefficients for the rational approximation
     const A1: f64 = -39.6968302866538;
     const A2: f64 = 220.946098424521;

@@ -108,7 +108,7 @@ pub fn run_jacknife<T: Send + Sync>(df: DataFrame, func: fn(DataFrame) -> T) -> 
     jacknife_stats
 }
 
-pub fn confidence_interval(bootstrap_stats: Vec<f64>, z: f64) -> ConfidenceInterval {
+pub fn percentile_interval(bootstrap_stats: Vec<f64>, z: f64) -> ConfidenceInterval {
     let runs = bootstrap_stats.drop_nans();
     let iterations = runs.len() as f64;
     let std = runs.std();
@@ -118,30 +118,37 @@ pub fn confidence_interval(bootstrap_stats: Vec<f64>, z: f64) -> ConfidenceInter
     (mean - x, mean, mean + x)
 }
 
-pub fn bca_confidence_interval(
+fn percentile_of_score(arr: &[f64], score: f64) -> f64 {
+    let a1 = arr.iter().filter(|x| x < &&score).count() as f64;
+    let a2 = arr.iter().filter(|x| x <= &&score).count() as f64;
+
+    (a1 + a2) / (2.0 * arr.len() as f64)
+}
+
+pub fn bca_interval(
     original_stat: f64,
     bootstrap_stats: Vec<f64>,
     jacknife_stats: Vec<f64>,
-    z: (f64, f64),
+    z: f64,
 ) -> ConfidenceInterval {
     let bootstrap_stats = bootstrap_stats.drop_nans();
     let jacknife_stats = jacknife_stats.drop_nans();
-    let z1 = z.0;
-    let z2 = z.1;
+    let z1 = -z;
+    let z2 = z;
 
-    let bias_correction_factor = distributions::norm_ppf(
-        bootstrap_stats
-            .iter()
-            .filter(|&x| x < &original_stat)
-            .count() as f64
-            / bootstrap_stats.len() as f64,
-    );
+    let bias_correction_factor =
+        distributions::norm_ppf(percentile_of_score(&bootstrap_stats, original_stat));
 
     let jacknife_mean = jacknife_stats.mean();
-    let diff: Vec<f64> = jacknife_stats.iter().map(|x| jacknife_mean - x).collect();
-
-    let acceleration_factor = (diff.iter().map(|x| x.powi(3)).sum::<f64>())
-        / (6.0 * diff.iter().map(|x| x.powi(2)).sum::<f64>().powf(1.5));
+    let n = jacknife_stats.len() as f64;
+    let n1 = n - 1.0;
+    let diff: Vec<f64> = jacknife_stats
+        .iter()
+        .map(|x| n1 * (jacknife_mean - x))
+        .collect();
+    let numerator = diff.iter().map(|x| x.powi(3)).sum::<f64>() / n.powi(3);
+    let denominator = diff.iter().map(|x| x.powi(2)).sum::<f64>() / n.powi(2);
+    let acceleration_factor = numerator / (6.0 * denominator.powf(1.5));
 
     let lower_p = distributions::norm_cdf(
         bias_correction_factor

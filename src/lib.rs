@@ -1,4 +1,6 @@
+use bootstrap::ConfidenceInterval;
 use polars::prelude::*;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3_polars::PyDataFrame;
 
@@ -12,23 +14,29 @@ macro_rules! generate_bootstrap_function {
         fn $func_name(
             df: PyDataFrame,
             iterations: u64,
-            z: (f64, f64),
+            z: f64,
+            method: &str,
             seed: Option<u64>,
         ) -> PyResult<bootstrap::ConfidenceInterval> {
             let df: DataFrame = df.into();
             let bootstrap_stats =
                 bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
-            if z.1.is_nan() {
-                Ok(bootstrap::confidence_interval(bootstrap_stats, z.0))
-            } else {
+            if method == "percentile" {
+                Ok(bootstrap::percentile_interval(bootstrap_stats, z))
+            } else if method == "BCa" {
                 let original_stat = $metric_func(df.clone());
                 let jacknife_stats = bootstrap::run_jacknife(df, $metric_func);
-                Ok(bootstrap::bca_confidence_interval(
+                Ok(bootstrap::bca_interval(
                     original_stat,
                     bootstrap_stats,
                     jacknife_stats,
                     z,
                 ))
+            } else {
+                Err(PyValueError::new_err(format!(
+                    "Invalid confidence interval method `{}`, only `percentile` and `BCa` are supported",
+                    method
+                )))
             }
         }
     };
@@ -46,12 +54,15 @@ fn _confusion_matrix(df: PyDataFrame) -> PyResult<metrics::ConfusionMatrixArray>
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
     iterations: u64,
-    z: (f64, f64),
+    z: f64,
+    method: &str,
     seed: Option<u64>,
 ) -> PyResult<Vec<bootstrap::ConfidenceInterval>> {
     let df: DataFrame = df.into();
 
-    Ok(metrics::bootstrap_confusion_matrix(df, iterations, z, seed))
+    Ok(metrics::bootstrap_confusion_matrix(
+        df, iterations, z, method, seed,
+    ))
 }
 
 #[pyfunction]
@@ -93,6 +104,26 @@ generate_bootstrap_function!(
 );
 
 #[pyfunction]
+fn _percentile_interval(bootstrap_stats: Vec<f64>, z: f64) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::percentile_interval(bootstrap_stats, z))
+}
+
+#[pyfunction]
+fn _bca_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    jacknife_stats: Vec<f64>,
+    z: f64,
+) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::bca_interval(
+        original_stat,
+        bootstrap_stats,
+        jacknife_stats,
+        z,
+    ))
+}
+
+#[pyfunction]
 fn _norm_ppf(q: f64) -> PyResult<f64> {
     Ok(distributions::norm_ppf(q))
 }
@@ -117,6 +148,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_mean, m)?)?;
     m.add_function(wrap_pyfunction!(_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_adverse_impact_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(_percentile_interval, m)?)?;
+    m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
 
