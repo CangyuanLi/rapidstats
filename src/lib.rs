@@ -54,14 +54,14 @@ fn _confusion_matrix(df: PyDataFrame) -> PyResult<metrics::ConfusionMatrixArray>
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
     iterations: u64,
-    z: f64,
+    alpha: f64,
     method: &str,
     seed: Option<u64>,
 ) -> PyResult<Vec<bootstrap::ConfidenceInterval>> {
     let df: DataFrame = df.into();
 
     Ok(metrics::bootstrap_confusion_matrix(
-        df, iterations, z, method, seed,
+        df, iterations, alpha, method, seed,
     ))
 }
 
@@ -104,8 +104,8 @@ generate_bootstrap_function!(
 );
 
 #[pyfunction]
-fn _percentile_interval(bootstrap_stats: Vec<f64>, z: f64) -> PyResult<ConfidenceInterval> {
-    Ok(bootstrap::percentile_interval(bootstrap_stats, z))
+fn _percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
 }
 
 #[pyfunction]
@@ -113,13 +113,13 @@ fn _bca_interval(
     original_stat: f64,
     bootstrap_stats: Vec<f64>,
     jacknife_stats: Vec<f64>,
-    z: f64,
+    alpha: f64,
 ) -> PyResult<ConfidenceInterval> {
     Ok(bootstrap::bca_interval(
         original_stat,
         bootstrap_stats,
         jacknife_stats,
-        z,
+        alpha,
     ))
 }
 

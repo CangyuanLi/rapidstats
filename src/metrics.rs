@@ -121,7 +121,7 @@ fn transpose_confusion_matrix_results(results: Vec<[f64; 25]>) -> [Vec<f64>; 25]
 pub fn bootstrap_confusion_matrix(
     df: DataFrame,
     iterations: u64,
-    z: f64,
+    alpha: f64,
     method: &str,
     seed: Option<u64>,
 ) -> Vec<bootstrap::ConfidenceInterval> {
@@ -134,7 +134,7 @@ pub fn bootstrap_confusion_matrix(
     if method == "percentile" {
         bs_transposed
             .into_iter()
-            .map(|bs| bootstrap::percentile_interval(bs, z))
+            .map(|bs| bootstrap::percentile_interval(bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "BCa" {
         let original_stats = confusion_matrix(base_cm.clone());
@@ -145,7 +145,7 @@ pub fn bootstrap_confusion_matrix(
             .into_iter()
             .zip(bs_transposed)
             .zip(js_transposed)
-            .map(|((original_stat, bs), js)| bootstrap::bca_interval(original_stat, bs, js, z))
+            .map(|((original_stat, bs), js)| bootstrap::bca_interval(original_stat, bs, js, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else {
         panic!("Invalid method");
