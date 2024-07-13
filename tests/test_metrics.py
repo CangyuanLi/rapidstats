@@ -34,6 +34,8 @@ TRUE_SCORE_COMBOS = [
     (Y_TRUE_SC, Y_SCORE_SC),
 ]
 
+BOOTSTRAP = rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED)
+
 
 def reference_confusion_matrix(y_true, y_pred):
     tn, fp, fn_, tp = sklearn.metrics.confusion_matrix(
@@ -60,7 +62,9 @@ def reference_confusion_matrix(y_true, y_pred):
     markedness = precision - false_omission_rate
     dor = plr / nlr
     balanced_accuracy = sklearn.metrics.balanced_accuracy_score(y_true, y_pred)
-    f1 = sklearn.metrics.f1_score(y_true, y_pred, zero_division=np.nan)
+    f1 = sklearn.metrics.f1_score(
+        y_true, y_pred, labels=[False, True], zero_division=np.nan
+    )
     folkes_mallows_index = sklearn.metrics.fowlkes_mallows_score(y_true, y_pred)
     mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
     acc = sklearn.metrics.accuracy_score(y_true, y_pred)
@@ -106,6 +110,23 @@ def test_confusion_matrix(y_true, y_pred):
     fs = rapidstats.confusion_matrix(y_true, y_pred).__dict__
 
     pytest.approx(list(fs.values())) == list(ref.values())
+
+
+# @pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
+# def test_bootstrap_confusion_matrix(y_true, y_pred):
+#     rs = BOOTSTRAP.confusion_matrix(y_true, y_pred)
+#     rs = (rs[0], rs[2])
+
+#     ref = scipy.stats.bootstrap(
+#         (y_true, y_pred),
+#         reference_confusion_matrix,
+#         n_resamples=BOOTSTRAP_ITERATIONS,
+#         method="percentile",
+#     ).confidence_interval
+#     ref = (ref.low, ref.high)
+
+#     for a, b in zip(rs, ref):
+#         assert pytest.approx(a, rel=1e-5) == b
 
 
 def reference_roc_auc(y_true, y_score):

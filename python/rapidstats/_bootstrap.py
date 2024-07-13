@@ -104,15 +104,14 @@ class Bootstrap:
         self.iterations = iterations
         self.confidence = confidence
         self.seed = seed
-        self.alpha = (1 + confidence) / 2
+        self.alpha = (1 - confidence) / 2
         self.method = method
 
         self._params = {
             "iterations": self.iterations,
-            "confidence": self.confidence,
-            "seed": self.seed,
             "alpha": self.alpha,
             "method": self.method,
+            "seed": self.seed,
         }
 
     def run(
