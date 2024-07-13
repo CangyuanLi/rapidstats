@@ -8,6 +8,10 @@ import rapidstats
 np.random.seed(208)
 
 
+def _alpha(confidence_level: float) -> float:
+    return (1 - confidence_level) / 2
+
+
 def reference_percentile_interval(bootstrap_stats, confidence_level):
     alpha = (1 - confidence_level) / 2
     interval = alpha, 1 - alpha
@@ -31,6 +35,29 @@ def test_percentile_interval():
     rs = rapidstats._bootstrap._percentile_interval(bootstrap_stats, alpha)
     rs = (rs[0], rs[2])
     ref = reference_percentile_interval(bootstrap_stats, confidence_level)
+
+    for a, b in zip(rs, ref):
+        assert pytest.approx(a) == b
+
+
+def reference_basic_interval(data, bootstrap_stats, confidence_level):
+    ci_l, ci_u = reference_percentile_interval(bootstrap_stats, confidence_level)
+    theta_hat = np.mean(data)
+    ci_l, ci_u = 2 * theta_hat - ci_u, 2 * theta_hat - ci_l
+
+    return ci_l, ci_u
+
+
+def test_basic_interval():
+    n = 1_000
+    confidence_level = 0.95
+    alpha = _alpha(confidence_level)
+    bootstrap_stats = np.random.uniform(size=n)
+    original_stat = np.mean(np.random.uniform(size=n))
+
+    rs = rapidstats._bootstrap._basic_interval(original_stat, bootstrap_stats, alpha)
+    rs = (rs[0], rs[2])
+    ref = reference_basic_interval(original_stat, bootstrap_stats, confidence_level)
 
     for a, b in zip(rs, ref):
         assert pytest.approx(a) == b
@@ -60,8 +87,8 @@ def test_bca_interval():
     n = 1_000
     confidence_level = 0.95
     alpha = (1 - confidence_level) / 2
-    bootstrap_stats = np.random.uniform(size=n)
-    data = np.random.uniform(size=n)
+    bootstrap_stats = np.random.uniform(size=n) * 100
+    data = np.random.randint(1, 100, size=n)
 
     def _mean(df):
         return df["x"].mean()

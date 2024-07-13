@@ -6,8 +6,8 @@ from typing import Callable, Literal, Optional
 import polars as pl
 from polars.series.series import ArrayLike
 
-from ._distributions import norm
 from ._rustystats import (
+    _basic_interval,
     _bca_interval,
     _bootstrap_adverse_impact_ratio,
     _bootstrap_brier_loss,
@@ -98,7 +98,7 @@ class Bootstrap:
         self,
         iterations: int = 1_000,
         confidence: float = 0.95,
-        method: Literal["percentile", "BCa"] = "percentile",
+        method: Literal["percentile", "basic", "BCa"] = "percentile",
         seed: Optional[int] = None,
     ) -> None:
         self.iterations = iterations
@@ -138,6 +138,9 @@ class Bootstrap:
 
         if self.method == "percentile":
             return _percentile_interval(bootstrap_stats, self.alpha)
+        elif self.method == "basic":
+            original_stat = stat_func(df)
+            return _basic_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "bCa":
             original_stat = stat_func(df)
             jacknife_stats = _jacknife(df, stat_func)
@@ -154,9 +157,7 @@ class Bootstrap:
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
-            *_bootstrap_confusion_matrix(
-                df, self.iterations, self.alpha, self.method, self.seed
-            )
+            *_bootstrap_confusion_matrix(df, **self._params)
         )
 
     def roc_auc(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:

@@ -136,6 +136,14 @@ pub fn bootstrap_confusion_matrix(
             .into_iter()
             .map(|bs| bootstrap::percentile_interval(bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
+    } else if method == "basic" {
+        let original_stats = confusion_matrix(base_cm.clone());
+
+        original_stats
+            .into_iter()
+            .zip(bs_transposed)
+            .map(|(original_stat, bs)| bootstrap::basic_interval(original_stat, bs, alpha))
+            .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "BCa" {
         let original_stats = confusion_matrix(base_cm.clone());
         let jacknife_stats = bootstrap::run_jacknife(base_cm, confusion_matrix);

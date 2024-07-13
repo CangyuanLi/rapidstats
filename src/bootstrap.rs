@@ -119,6 +119,21 @@ pub fn percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceI
     )
 }
 
+pub fn basic_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> ConfidenceInterval {
+    let interval = percentile_interval(bootstrap_stats, alpha);
+    let lower = interval.0;
+    let mean = interval.1;
+    let upper = interval.2;
+
+    let x = 2.0 * original_stat;
+
+    (x - upper, mean, x - lower)
+}
+
 fn percentile_of_score(arr: &[f64], score: f64) -> f64 {
     let a1 = arr.iter().filter(|x| x < &&score).count() as f64;
     let a2 = arr.iter().filter(|x| x <= &&score).count() as f64;

@@ -23,6 +23,9 @@ macro_rules! generate_bootstrap_function {
                 bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
             if method == "percentile" {
                 Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
+            } else if method == "basic" {
+                let original_stat = $metric_func(df.clone());
+                Ok(bootstrap::basic_interval(original_stat, bootstrap_stats, alpha))
             } else if method == "BCa" {
                 let original_stat = $metric_func(df.clone());
                 let jacknife_stats = bootstrap::run_jacknife(df, $metric_func);
@@ -109,6 +112,19 @@ fn _percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<Confi
 }
 
 #[pyfunction]
+fn _basic_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::basic_interval(
+        original_stat,
+        bootstrap_stats,
+        alpha,
+    ))
+}
+
+#[pyfunction]
 fn _bca_interval(
     original_stat: f64,
     bootstrap_stats: Vec<f64>,
@@ -149,6 +165,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_adverse_impact_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(_percentile_interval, m)?)?;
+    m.add_function(wrap_pyfunction!(_basic_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
