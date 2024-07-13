@@ -37,6 +37,14 @@ TRUE_SCORE_COMBOS = [
 BOOTSTRAP = rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED)
 
 
+def reference_f1(y_true, y_pred):
+    f1 = sklearn.metrics.f1_score(
+        y_true, y_pred, labels=[False, True], zero_division=np.nan
+    )
+
+    return f1
+
+
 def reference_confusion_matrix(y_true, y_pred):
     tn, fp, fn_, tp = sklearn.metrics.confusion_matrix(
         y_true, y_pred, labels=[False, True]
@@ -62,9 +70,7 @@ def reference_confusion_matrix(y_true, y_pred):
     markedness = precision - false_omission_rate
     dor = plr / nlr
     balanced_accuracy = sklearn.metrics.balanced_accuracy_score(y_true, y_pred)
-    f1 = sklearn.metrics.f1_score(
-        y_true, y_pred, labels=[False, True], zero_division=np.nan
-    )
+    f1 = reference_f1(y_true, y_pred)
     folkes_mallows_index = sklearn.metrics.fowlkes_mallows_score(y_true, y_pred)
     mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
     acc = sklearn.metrics.accuracy_score(y_true, y_pred)
@@ -112,21 +118,42 @@ def test_confusion_matrix(y_true, y_pred):
     pytest.approx(list(fs.values())) == list(ref.values())
 
 
-# @pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
-# def test_bootstrap_confusion_matrix(y_true, y_pred):
-#     rs = BOOTSTRAP.confusion_matrix(y_true, y_pred)
-#     rs = (rs[0], rs[2])
+@pytest.mark.parametrize("y_true,y_pred", [(Y_TRUE, Y_PRED)])
+def test_bootstrap_f1(y_true, y_pred):
+    # Unfortunately, it is difficult to test if I implemented the bootstrap exactly
+    # correctly compared to scipy.stats.bootstrap. Even if I use the same seed, the
+    # random number generators are different. The best I can do is 1) test if the
+    # metrics are the same and 2) if the interval calculations are the same. However,
+    # this does mean that there could be something wrong with how I implement the
+    # resampling for getting the bootstrap runs. For some measure of confidence, lets
+    # run both bootstraps 20 times and take the mean of the results, and see if this
+    # mean is roughly similar.
+    rs_res = []
+    ref_res = []
+    for i in range(20):
+        rs = (
+            rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED + i)
+            .confusion_matrix(y_true, y_pred)
+            .f1
+        )
+        rs_res.append((rs[0], rs[2]))
 
-#     ref = scipy.stats.bootstrap(
-#         (y_true, y_pred),
-#         reference_confusion_matrix,
-#         n_resamples=BOOTSTRAP_ITERATIONS,
-#         method="percentile",
-#     ).confidence_interval
-#     ref = (ref.low, ref.high)
+        ref = scipy.stats.bootstrap(
+            (y_true, y_pred),
+            reference_f1,
+            n_resamples=BOOTSTRAP_ITERATIONS,
+            method="percentile",
+            random_state=SEED + i,
+        ).confidence_interval
+        ref_res.append((ref.low, ref.high))
 
-#     for a, b in zip(rs, ref):
-#         assert pytest.approx(a, rel=1e-5) == b
+    rs_lower = np.mean([rs[0] for rs in rs_res])
+    rs_upper = np.mean([rs[1] for rs in rs_res])
+    ref_lower = np.mean([ref[0] for ref in ref_res])
+    ref_upper = np.mean([ref[1] for ref in ref_res])
+
+    assert pytest.approx(rs_lower, rel=1e-2) == ref_lower
+    assert pytest.approx(rs_upper, rel=1e-2) == ref_upper
 
 
 def reference_roc_auc(y_true, y_score):
