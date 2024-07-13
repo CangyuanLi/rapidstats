@@ -12,6 +12,9 @@ classifiers = [
 ]
 dependencies = ["polars>=0.20.13", "tqdm"]
 
+[project.optional-dependencies]
+pyarrow = ["pyarrow >= 7.0.0"]
+
 [project.urls]
 "Homepage" = "https://github.com/CangyuanLi/rapidstats"
 "Source" = "https://github.com/CangyuanLi/rapidstats"
