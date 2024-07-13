@@ -3,9 +3,10 @@ from typing import Union
 
 import polars as pl
 import polars.selectors as cs
-from polars.type_aliases import CorrelationMethod
+from polars._typing import CorrelationMethod, FrameInitTypes
+from polars.interchange.protocol import SupportsInterchange
 
-PolarsFrame = Union[pl.DataFrame, pl.LazyFrame]
+ConvertibleToPolars = Union[SupportsInterchange, FrameInitTypes]
 
 
 def _pairs(l1, l2) -> list[tuple]:
@@ -16,12 +17,55 @@ def _corr_expr(c1, c2, method: CorrelationMethod):
     return pl.corr(c1, c2, method=method).alias(f"{c1}_{c2}")
 
 
+def _to_polars(
+    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
+) -> pl.DataFrame:
+    if isinstance(data, pl.DataFrame):
+        return data
+    elif isinstance(data, pl.LazyFrame):
+        return data
+    elif hasattr(data, "to_polars"):
+        return data.to_polars()
+
+    try:
+        return pl.DataFrame(data)
+    except TypeError:
+        if hasattr(data, "__dataframe__"):
+            return pl.from_dataframe(data)
+        else:
+            raise TypeError("`data` must be convertible to a Polars DataFrames")
+
+
 def correlation_matrix(
-    pf: PolarsFrame,
+    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
     l1: list[str] = None,
     l2: list[str] = None,
     method: CorrelationMethod = "pearson",
-):
+) -> pl.DataFrame:
+    """Compute the correlation matrix between two lists of columns. If both lists are
+    None, then the correlation matrix is over all columns in the input DataFrame.
+
+    Parameters
+    ----------
+    data : Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
+        The input DataFrame. It must be either a Polars Frame or something convertible
+        to a Polars Frame.
+    l1 : list[str], optional
+        A list of columns to appear as the columns of the correlation matrix,
+        by default None
+    l2 : list[str], optional
+        A list of columns to appear as the rows of the correlation matrix,
+        by default None
+    method : CorrelationMethod, optional
+        How to calculate the correlation, by default "pearson"
+
+    Returns
+    -------
+    pl.DataFrame
+        A correlation matrix with `l1` as the columns and `l2` as the rows
+    """
+    pf = _to_polars(data)
+
     if l1 is None and l2 is None:
         original = pf.select(cs.numeric() | cs.boolean()).columns
         new_columns = [f"{i}" for i, _ in enumerate(original)]
