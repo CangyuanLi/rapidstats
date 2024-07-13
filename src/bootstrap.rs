@@ -108,14 +108,15 @@ pub fn run_jacknife<T: Send + Sync>(df: DataFrame, func: fn(DataFrame) -> T) -> 
     jacknife_stats
 }
 
-pub fn percentile_interval(bootstrap_stats: Vec<f64>, z: f64) -> ConfidenceInterval {
+pub fn percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceInterval {
     let runs = bootstrap_stats.drop_nans();
-    let iterations = runs.len() as f64;
-    let std = runs.std();
     let mean = runs.mean();
-    let x = z * std / iterations.sqrt();
 
-    (mean - x, mean, mean + x)
+    (
+        runs.percentile(alpha * 100.0),
+        mean,
+        runs.percentile((1.0 - alpha) * 100.0),
+    )
 }
 
 fn percentile_of_score(arr: &[f64], score: f64) -> f64 {
@@ -129,12 +130,12 @@ pub fn bca_interval(
     original_stat: f64,
     bootstrap_stats: Vec<f64>,
     jacknife_stats: Vec<f64>,
-    z: f64,
+    alpha: f64,
 ) -> ConfidenceInterval {
     let bootstrap_stats = bootstrap_stats.drop_nans();
     let jacknife_stats = jacknife_stats.drop_nans();
-    let z1 = -z;
-    let z2 = z;
+    let z1 = distributions::norm_ppf(alpha);
+    let z2 = -z1;
 
     let bias_correction_factor =
         distributions::norm_ppf(percentile_of_score(&bootstrap_stats, original_stat));

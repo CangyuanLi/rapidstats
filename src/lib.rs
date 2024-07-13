@@ -14,7 +14,7 @@ macro_rules! generate_bootstrap_function {
         fn $func_name(
             df: PyDataFrame,
             iterations: u64,
-            z: f64,
+            alpha: f64,
             method: &str,
             seed: Option<u64>,
         ) -> PyResult<bootstrap::ConfidenceInterval> {
@@ -22,7 +22,7 @@ macro_rules! generate_bootstrap_function {
             let bootstrap_stats =
                 bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
             if method == "percentile" {
-                Ok(bootstrap::percentile_interval(bootstrap_stats, z))
+                Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
             } else if method == "BCa" {
                 let original_stat = $metric_func(df.clone());
                 let jacknife_stats = bootstrap::run_jacknife(df, $metric_func);
@@ -30,7 +30,7 @@ macro_rules! generate_bootstrap_function {
                     original_stat,
                     bootstrap_stats,
                     jacknife_stats,
-                    z,
+                    alpha,
                 ))
             } else {
                 Err(PyValueError::new_err(format!(

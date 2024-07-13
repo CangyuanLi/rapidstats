@@ -104,14 +104,14 @@ class Bootstrap:
         self.iterations = iterations
         self.confidence = confidence
         self.seed = seed
-        self.z = norm.ppf((1 + confidence) / 2)
+        self.alpha = (1 + confidence) / 2
         self.method = method
 
         self._params = {
             "iterations": self.iterations,
             "confidence": self.confidence,
             "seed": self.seed,
-            "z": self.z,
+            "alpha": self.alpha,
             "method": self.method,
         }
 
@@ -138,12 +138,14 @@ class Bootstrap:
             return (math.nan, math.nan, math.nan)
 
         if self.method == "percentile":
-            return _percentile_interval(bootstrap_stats, self.z)
+            return _percentile_interval(bootstrap_stats, self.alpha)
         elif self.method == "bCa":
             original_stat = stat_func(df)
             jacknife_stats = _jacknife(df, stat_func)
 
-            return _bca_interval(original_stat, bootstrap_stats, jacknife_stats, self.z)
+            return _bca_interval(
+                original_stat, bootstrap_stats, jacknife_stats, self.alpha
+            )
 
     def confusion_matrix(
         self,
@@ -154,7 +156,7 @@ class Bootstrap:
 
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(
-                df, self.iterations, self.z, self.method, self.seed
+                df, self.iterations, self.alpha, self.method, self.seed
             )
         )
 
