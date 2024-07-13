@@ -1,0 +1,27 @@
+site_name: rapidstats API Reference
+site_url: https://cangyuanli.github.io/rapidstats/
+
+use_directory_urls: false
+
+nav:
+- Home: index.md
+- Bootstrap: bootstrap.md
+- Correlation: correlation.md
+
+theme:
+  name: material
+  locale: en
+  highlightjs: true
+  features:
+    - content.code.copy
+
+plugins:
+- search
+- section-index
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [python]
+        options:
+          summary: true
+          docstring_style: numpy

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import functools
 import math
@@ -52,11 +54,18 @@ class BootstrappedConfusionMatrix:
     dor: ConfidenceInterval
 
     def to_polars(self) -> pl.DataFrame:
+        """Transform the dataclass to a long Polars dataframe with columns
+        `metric`, `lower`, `mean`, and `upper`.
+
+        Returns
+        -------
+        pl.DataFrame
+        """
         dct = self.__dict__
         lower = []
         mean = []
         upper = []
-        for l, m, u in dct.values():
+        for l, m, u in dct.values():  # noqa: E741
             lower.append(l)
             mean.append(m)
             upper.append(u)
@@ -94,6 +103,55 @@ def _jacknife(
 
 
 class Bootstrap:
+    """Computes a two-sided bootstrap confidence interval of a statistic. The
+    process is as follows:
+
+    1. Resample 100% of the data with replacement for `iterations`
+    2. Compute the statistic on each resample
+
+    If the method is `percentile`, we stop here and compute the interval of the
+    bootstrap distribution that is symmetric about the median and contains
+    `confidence` of the bootstrap statistics.
+
+    If the method is `basic`, compute the statistic on the original data and
+    generate the "Reverse Percentile Interval."
+
+    If the method is `BCa`,
+
+    3. Compute the statistic on the original data
+    4. Compute the statistic on the data with the ith row deleted (jacknife)
+
+    and generate the "Bias Corrected and Accelerated Interval."
+
+    The result of each method will be a three-tuple of (lower, mean, upper).
+
+    Parameters
+    ----------
+    iterations : int, optional
+        How many times to resample the data, by default 1_000
+    confidence : float, optional
+        The confidence level, by default 0.95
+    method : Literal[&quot;percentile&quot;, &quot;basic&quot;, &quot;BCa&quot;], optional
+        Whether to return the Percentile, Basic / Reverse Percentile, or
+        Bias Corrected and Accelerated Interval, by default "percentile"
+    seed : Optional[int], optional
+        Seed that controls resampling. Set this to any integer to make results
+        reproducible, by default None
+
+    Raises
+    ------
+    ValueError
+        If the method is not one of `percentile`, `basic`, or `BCa`
+
+    Examples
+    --------
+    ``` py
+    import rapidstats
+    ci = rapidstats.Bootstrap(seed=208).mean([1, 2, 3])
+    ```
+    (1.0, 1.9783333333333328, 3.0)
+    """
+
     def __init__(
         self,
         iterations: int = 1_000,
@@ -101,6 +159,11 @@ class Bootstrap:
         method: Literal["percentile", "basic", "BCa"] = "percentile",
         seed: Optional[int] = None,
     ) -> None:
+        if method not in ("percentile", "basic", "BCa"):
+            raise ValueError(
+                f"Invalid confidence interval method `{method}`, only `percentile`, `basic`, and `BCa` are supported",
+            )
+
         self.iterations = iterations
         self.confidence = confidence
         self.seed = seed
@@ -141,7 +204,7 @@ class Bootstrap:
         elif self.method == "basic":
             original_stat = stat_func(df)
             return _basic_interval(original_stat, bootstrap_stats, self.alpha)
-        elif self.method == "bCa":
+        elif self.method == "BCa":
             original_stat = stat_func(df)
             jacknife_stats = _jacknife(df, stat_func)
 

@@ -55,7 +55,7 @@ def _bootstrap_adverse_impact_ratio(
 def _percentile_interval(
     bootstrap_stats: list[float], alpha: float
 ) -> ConfidenceInterval: ...
-def _percentile_interval(
+def _basic_interval(
     original_stat: float, bootstrap_stats: list[float], alpha: float
 ) -> ConfidenceInterval: ...
 def _bca_interval(
