@@ -1239,7 +1239,7 @@ dependencies = [
 
 [[package]]
 name = "rapidstats"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "ndarray",
  "paste",
