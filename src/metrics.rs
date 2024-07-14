@@ -1,5 +1,5 @@
 use crate::bootstrap;
-use ndarray::{s, ArrayView1};
+use ndarray::{s, ArrayView1, Data};
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
@@ -298,4 +298,17 @@ pub fn adverse_impact_ratio(df: DataFrame) -> f64 {
     let control = y_pred.filter(is_control).unwrap();
 
     protected.mean().unwrap_or(f64::NAN) / control.mean().unwrap_or(f64::NAN)
+}
+
+pub fn mean_squared_error(df: DataFrame) -> f64 {
+    let y_true = df["y_true"].f64().unwrap();
+    let y_score = df["y_score"].f64().unwrap();
+
+    let x = &(y_true - y_score);
+
+    (x * x).mean().unwrap()
+}
+
+pub fn root_mean_squared_error(df: DataFrame) -> f64 {
+    mean_squared_error(df).sqrt()
 }

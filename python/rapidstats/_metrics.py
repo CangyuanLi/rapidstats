@@ -9,9 +9,11 @@ from ._rustystats import (
     _confusion_matrix,
     _max_ks,
     _mean,
+    _mean_squared_error,
     _roc_auc,
+    _root_mean_squared_error,
 )
-from ._utils import _y_true_y_pred_to_df, _y_true_y_score_to_df
+from ._utils import _regression_to_df, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
 
 @dataclasses.dataclass
@@ -119,7 +121,7 @@ class ConfusionMatrix:
 
 
 def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
-    """Compute the 25 confusion matrix metrics (TP, FP, TN, FN, TPR, F1, etc.). Please
+    """Computes the 25 confusion matrix metrics (TP, FP, TN, FN, TPR, F1, etc.). Please
     see https://en.wikipedia.org/wiki/Confusion_matrix for a list of all confusion
     matrix metrics and their formulas.
 
@@ -141,7 +143,7 @@ def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
 
 
 def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
-    """Compute Area Under the Receiver Operating Characteristic Curve.
+    """Computes Area Under the Receiver Operating Characteristic Curve.
 
     Parameters
     ----------
@@ -192,7 +194,7 @@ def max_ks(y_true: ArrayLike, y_score: ArrayLike) -> float:
 
 
 def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
-    r"""Compute the Brier loss (smaller is better). The Brier loss measures the mean
+    r"""Computes the Brier loss (smaller is better). The Brier loss measures the mean
     squared difference between the predicted scores and the ground truth target.
     Calculated as:
 
@@ -262,3 +264,47 @@ def adverse_impact_ratio(
             {"y_pred": y_pred, "protected": protected, "control": control}
         ).cast(pl.Boolean)
     )
+
+
+def mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    r"""Computes Mean Squared Error (MSE) as
+
+    \[ \frac{1}{N} \sum_{1}^{N} (yt_i - ys_i)^2 \],
+
+    where \( yt \) is `y_true` and \( ys \) is `y_score`.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    float
+        Mean Squared Error (MSE)
+    """
+    return _mean_squared_error(_regression_to_df(y_true, y_score))
+
+
+def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    r"""Computes Root Mean Squared Error (RMSE) as
+
+    \[ \sqrt{\frac{1}{N} \sum_{1}^{N} (yt_i - ys_i)^2} \],
+
+    where \( yt \) is `y_true` and \( ys \) is `y_score`.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    float
+        Root Mean Squared Error (RMSE)
+    """
+    return _root_mean_squared_error(_regression_to_df(y_true, y_score))

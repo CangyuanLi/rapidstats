@@ -16,10 +16,17 @@ from ._rustystats import (
     _bootstrap_confusion_matrix,
     _bootstrap_max_ks,
     _bootstrap_mean,
+    _bootstrap_mean_squared_error,
     _bootstrap_roc_auc,
+    _bootstrap_root_mean_squared_error,
     _percentile_interval,
 )
-from ._utils import _run_concurrent, _y_true_y_pred_to_df, _y_true_y_score_to_df
+from ._utils import (
+    _regression_to_df,
+    _run_concurrent,
+    _y_true_y_pred_to_df,
+    _y_true_y_score_to_df,
+)
 
 ConfidenceInterval = tuple[float, float, float]
 StatFunc = Callable[[pl.DataFrame], float]
@@ -139,7 +146,7 @@ class Bootstrap:
         How many times to resample the data, by default 1_000
     confidence : float, optional
         The confidence level, by default 0.95
-    method : Literal["percentile";, "basic", "BCa"], optional
+    method : Literal["percentile", "basic", "BCa"], optional
         Whether to return the Percentile, Basic / Reverse Percentile, or
         Bias Corrected and Accelerated Interval, by default "percentile"
     seed : Optional[int], optional
@@ -340,7 +347,7 @@ class Bootstrap:
     def adverse_impact_ratio(
         self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
     ) -> ConfidenceInterval:
-        """Bootstrap AIR. See [rapidstats.adverse_impact_ratio][] for more information.
+        """Bootstrap AIR. See [rapidstats.adverse_impact_ratio][] for more details.
 
         Parameters
         ----------
@@ -361,3 +368,41 @@ class Bootstrap:
         ).cast(pl.Boolean)
 
         return _bootstrap_adverse_impact_ratio(df, **self._params)
+
+    def mean_squared_error(self, y_true: ArrayLike, y_score: ArrayLike) -> float:
+        r"""Bootstrap MSE. See [rapidstats.mean_squared_error][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
+        return _bootstrap_mean_squared_error(
+            _regression_to_df(y_true, y_score), **self._params
+        )
+
+    def root_mean_squared_error(self, y_true: ArrayLike, y_score: ArrayLike) -> float:
+        r"""Bootstrap RMSE. See [rapidstats.root_mean_squared_error][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
+        return _bootstrap_root_mean_squared_error(
+            _regression_to_df(y_true, y_score), **self._params
+        )

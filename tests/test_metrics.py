@@ -34,7 +34,8 @@ TRUE_SCORE_COMBOS = [
     (Y_TRUE_SC, Y_SCORE_SC),
 ]
 
-BOOTSTRAP = rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED)
+Y_TRUE_REG = np.random.rand(N_ROWS)
+Y_SCORE_REG = np.random.rand(N_ROWS)
 
 
 def reference_f1(y_true, y_pred):
@@ -201,5 +202,19 @@ def test_brier_loss(y_true, y_score):
 def test_mean(y_true):
     ref = y_true.mean()
     res = rapidstats.mean(y_true)
+
+    pytest.approx(res) == ref
+
+
+def test_mean_squared_error():
+    res = rapidstats.mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
+    ref = sklearn.metrics.mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
+
+    pytest.approx(res) == ref
+
+
+def test_root_mean_squared_error():
+    res = rapidstats.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
+    ref = sklearn.metrics.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
 
     pytest.approx(res) == ref

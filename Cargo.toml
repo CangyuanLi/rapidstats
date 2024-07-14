@@ -9,6 +9,7 @@ crate-type = [ "cdylib",]
 
 [dependencies]
 ndarray = "0.15.6"
+paste = "1.0.15"
 pyo3 = "0.21.0"
 pyo3-polars = "0.14.0"
 rayon = "1.10.0"

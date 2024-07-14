@@ -7,5 +7,7 @@ from ._metrics import (
     confusion_matrix,
     max_ks,
     mean,
+    mean_squared_error,
     roc_auc,
+    root_mean_squared_error,
 )
