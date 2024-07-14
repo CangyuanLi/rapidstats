@@ -1233,7 +1233,7 @@ dependencies = [
 
 [[package]]
 name = "rapidstats"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "ndarray",
  "polars",
