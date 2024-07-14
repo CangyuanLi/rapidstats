@@ -206,6 +206,17 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="index.html" class="md-nav__link md-nav__link--active">
         
   
@@ -215,6 +226,34 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is it?
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -260,6 +299,26 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="metrics.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -280,6 +339,23 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is it?
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -293,7 +369,31 @@
                   
 
 
-<h1 id="rapidstats">rapidstats</h1>
+<h1 id="rapidstats">rapidstats:</h1>
+<p><a href="https://badge.fury.io/py/rapidstats"><img alt="PyPI version" src="https://badge.fury.io/py/rapidstats.svg" /></a>
+<img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/rapidstats" />
+<a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
+<img alt="Tests" src="https://github.com/CangyuanLi/rapidstats/actions/workflows/tests.yaml/badge.svg" />
+<a href="https://github.com/pre-commit/pre-commit"><img alt="pre-commit" src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&amp;logoColor=white" /></a>
+<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
+<a href="https://pycqa.github.io/isort/"><img alt="Imports: isort" src="https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&amp;labelColor=ef8336" /></a></p>
+<p align="center">
+  <a href="https://cangyuanli.github.io/rapidstats/latest/">Documentation</a>
+<br>
+</p>
+
+<h2 id="what-is-it">What is it?</h2>
+<p><strong>rapidstats</strong> is a minimal library that implements fast statistical routines in Rust and Polars. Currently, its core purpose is to provide the Bootstrap class. Unlike scipy.stats.bootstrap, the Bootstrap class contains specialized functions (for e.g. confusion matrix, ROC-AUC, and so on) implemented in Rust as well as a generic interface for any Python callable. This makes it significantly faster than passing in a callable on the Python side. For example, bootstrapping confusion matrix statistics can be up to 40x faster.</p>
+<p><em>This library is in an alpha state. Although all functions are tested against existing libraries, use at your own risk. The API is subject to change very frequently.</em></p>
+<h1 id="usage">Usage:</h1>
+<h2 id="dependencies">Dependencies</h2>
+<p><strong>rapidstats</strong> has a minimal set of dependencies. It only depends on Polars and tqdm (for progress bars). You may install pyarrow (<code>pip install rapidstats[pyarrow]</code>) to allow functions to take NumPy arrays, Pandas objects, and other objects that may be converted through Arrow.</p>
+<h2 id="installing">Installing</h2>
+<p>The easiest way is to install <strong>rapidstats</strong> is from PyPI using pip:</p>
+<pre><code class="language-sh">pip install rapidstats
+</code></pre>
+<h1 id="notes">Notes</h1>
+<p>The purpose of <strong>rapidstats</strong> is not to replace scipy or scikit-learn, which would be a massive undertaking. At the moment, only functions that are not easily achievable using existing libraries or functions that are significantly more performant (e.g. the core loop is implemented in Rust) will be added.</p>
 
 
 
@@ -344,6 +444,10 @@
     
     
       <script src="assets/javascripts/bundle.d7c377c4.min.js"></script>
+      
+        <script src="javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
