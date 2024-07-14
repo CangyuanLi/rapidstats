@@ -27,6 +27,13 @@ StatFunc = Callable[[pl.DataFrame], float]
 
 @dataclasses.dataclass
 class BootstrappedConfusionMatrix:
+    """Result object returned by `rapidstats.Bootstrap().confusion_matrix`.
+
+    See [rapidstats._metrics.ConfusionMatrix][] for a detailed breakdown of the attributes stored in
+    this class. However, instead of storing the statistic, it stores the bootstrapped
+    confidence interval as (lower, mean, upper).
+    """
+
     tn: ConfidenceInterval
     fp: ConfidenceInterval
     fn: ConfidenceInterval
@@ -54,12 +61,13 @@ class BootstrappedConfusionMatrix:
     dor: ConfidenceInterval
 
     def to_polars(self) -> pl.DataFrame:
-        """Transform the dataclass to a long Polars dataframe with columns
+        """Transform the dataclass to a long Polars DataFrame with columns
         `metric`, `lower`, `mean`, and `upper`.
 
         Returns
         -------
         pl.DataFrame
+            A DataFrame with columns `metric`, `lower`, `mean`, and `upper`
         """
         dct = self.__dict__
         lower = []
@@ -131,7 +139,7 @@ class Bootstrap:
         How many times to resample the data, by default 1_000
     confidence : float, optional
         The confidence level, by default 0.95
-    method : Literal[&quot;percentile&quot;, &quot;basic&quot;, &quot;BCa&quot;], optional
+    method : Literal["percentile";, "basic", "BCa"], optional
         Whether to return the Percentile, Basic / Reverse Percentile, or
         Bias Corrected and Accelerated Interval, by default "percentile"
     seed : Optional[int], optional
@@ -180,6 +188,22 @@ class Bootstrap:
     def run(
         self, df: pl.DataFrame, stat_func: StatFunc, **kwargs
     ) -> ConfidenceInterval:
+        """Run bootstrap for an arbitrary function that accepts a Polars DataFrame and
+        returns a scalar real number.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            The data to pass to `stat_func`
+        stat_func : StatFunc
+            A callable that takes a Polars DataFrame as its first argument and returns
+            a scalar real number.
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, higher)
+        """
         default = {"executor": "threads", "preserve_order": False}
         for k, v in default.items():
             if k not in kwargs:
@@ -217,6 +241,22 @@ class Bootstrap:
         y_true: ArrayLike,
         y_pred: ArrayLike,
     ) -> BootstrappedConfusionMatrix:
+        """Bootstrap confusion matrix. See [rapidstats.confusion_matrix][] for
+        more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_pred : ArrayLike
+            Predicted target
+
+        Returns
+        -------
+        BootstrappedConfusionMatrix
+            A dataclass of 25 confusion matrix metrics as (lower, mean, upper). See
+            [rapidstats._bootstrap.BootstrappedConfusionMatrix][] for more details.
+        """
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
@@ -224,28 +264,98 @@ class Bootstrap:
         )
 
     def roc_auc(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        """Bootstrap ROC-AUC. See [rapidstats.roc_auc][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = _y_true_y_score_to_df(y_true, y_score)
 
         return _bootstrap_roc_auc(df, **self._params)
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        """Bootstrap Max-KS. See [rapidstats.max_ks][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = _y_true_y_score_to_df(y_true, y_score)
 
         return _bootstrap_max_ks(df, **self._params)
 
     def brier_loss(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        """Bootstrap Brier loss. See [rapidstats.brier_loss][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = _y_true_y_score_to_df(y_true, y_score)
 
         return _bootstrap_brier_loss(df, **self._params)
 
     def mean(self, y: ArrayLike) -> ConfidenceInterval:
+        """Bootstrap mean.
+
+        Parameters
+        ----------
+        y : ArrayLike
+            A 1D-array
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = pl.DataFrame({"y": y})
 
         return _bootstrap_mean(df, **self._params)
 
     def adverse_impact_ratio(
         self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
-    ):
+    ) -> ConfidenceInterval:
+        """Bootstrap AIR. See [rapidstats.adverse_impact_ratio][] for more information.
+
+        Parameters
+        ----------
+        y_pred : ArrayLike
+            Predicted target
+        protected : ArrayLike
+            An array of booleans identifying the protected class
+        control : ArrayLike
+            An array of booleans identifying the control class
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = pl.DataFrame(
             {"y_pred": y_pred, "protected": protected, "control": control}
         ).cast(pl.Boolean)

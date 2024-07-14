@@ -7,6 +7,7 @@ nav:
 - Home: index.md
 - Bootstrap: bootstrap.md
 - Correlation: correlation.md
+- Metrics: metrics.md
 
 theme:
   name: material
@@ -25,6 +26,16 @@ plugins:
         options:
           summary: true
           docstring_style: numpy
+
+markdown_extensions:
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 extra:
   version:

@@ -1,1 +1,1 @@
-# rapidstats
+--8<-- "README.md"
