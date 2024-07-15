@@ -119,35 +119,115 @@ def _jacknife(
 
 
 class Bootstrap:
-    r"""Computes a two-sided bootstrap confidence interval of a statistic. The
-    process is as follows:
+    r"""Computes a two-sided bootstrap confidence interval of a statistic. Note that
+    \( \alpha \) is then defined as \( \frac{1 - \text{confidence}}{2} \). Regardless
+    of method, the result will be a three-tuple of (lower, mean, upper). The process is
+    as follows:
 
-    1. Resample 100% of the data with replacement for `iterations`
-    2. Compute the statistic on each resample
+    - Resample 100% of the data with replacement for `iterations`
+    - Compute the statistic on each resample
 
-    If the method is `standard`, we stop here and compute the interval as
+    If the method is `standard`,
 
-    \[ \hat{\theta} \pm z \times \hat{se} \]
+    - Compute the mean \( \hat{\theta} \) of the bootstrap statistics
+    - Compute the standard error of the bootstrap statistics
 
-    where \( \hat{\theta} \) is the bootstrap mean, \( z \) is the Z-score determined
-    by \( \alpha = \frac{1 - \text{confidence}}{2} \). \( \hat{se} \) is the bootstrap
-    standard error yielded by \( \frac{\hat{\sigma}}{\sqrt{N}} \).
+        \[ \hat{se} = \frac{\hat{\sigma}}{\sqrt{N}} \]
+
+    - Compute the Z-score
+
+        \[ z_{\alpha} = \phi^{-1}(\alpha) \]
+
+    where \( \phi^{-1} \) is the quantile, inverse CDF, or percent-point function
+
+    Then the "Standard" interval is
+
+    \[ \hat{\theta} \pm z_{\alpha} \times \hat{se} \]
 
     If the method is `percentile`, we stop here and compute the interval of the
     bootstrap distribution that is symmetric about the median and contains
-    `confidence` of the bootstrap statistics.
+    `confidence` of the bootstrap statistics. Then the "Percentile" interval is
 
-    If the method is `basic`, compute the statistic on the original data and
-    generate the "Reverse Percentile Interval."
+    \[
+        \text{percentile}(\hat{\theta}^{*}, \alpha),
+        \text{percentile}(\hat{\theta}^{*}, 1 - \alpha)
+    \]
+
+    where \( \hat{\theta}^{*} \) is the vector of bootstrap statistics.
+
+    If the method is `basic`,
+
+    - Compute the statistic on the original data
+    - Compute the "Percentile" interval
+
+    Then the "Basic" or "Reverse Percentile" interval is
+
+    \[
+        2\hat{\theta} - PCI_u,
+        2\hat{\theta} - PCI_l,
+    \]
+
+    where \( \hat{\theta} \) is the statistic on the original data, \( PCI_u \) is the
+    upper bound of the "Percentile" interval, and \( PCI_l \) is the lower bound of the
+    "Percentile" interval.
 
     If the method is `BCa`,
 
-    3. Compute the statistic on the original data
-    4. Compute the statistic on the data with the ith row deleted (jacknife)
+    - Compute the statistic on the original data \( \hat{\theta} \)
+    - Compute the statistic on the data with the \( i^{th} \) row deleted (jacknife)
+    - Compute the bias correction factor as
 
-    and generate the "Bias Corrected and Accelerated Interval."
+    \[
+        \hat{z_0} = \phi^{-1}(
+            \frac{\sum_{i=1}^B \hat{\theta_i}^{*} \le \hat{\theta}
+            + \sum_{i=1}^B \hat{\theta_i}^{*} \leq \hat{\theta}}{2 * B}
+        )
+    \]
 
-    The result of each method will be a three-tuple of (lower, mean, upper).
+    where \( \hat{\theta}^{*} \) is the vector of bootstrap statistics and \( B \) is
+    the length of that vector.
+
+    - Compute the acceleration factor as
+
+    \[
+        \hat{a} = \frac{1}{6} \frac{
+            \sum_{i=1}^{N} (\hat{\theta_{(.)}} - \hat{\theta_i})^3
+        }{
+            \sum_{i=1}^{N} [(\hat{\theta_{(.)}} - \hat{\theta_i})^2]^{1.5}
+        }
+    \]
+
+    where \( \hat{\theta_{(.)}} \) is the mean of the jacknife statistics and
+    \( \hat{\theta_i} \) is the \( i^{th} \) element of the jacknife vector.
+
+    - Compute the lower and upper percentiles as
+
+    \[
+        \alpha_l = \phi(
+            \hat{z_0} + \frac{\hat{z_0} + z_{\alpha}}{1 - \hat{a}(\hat{z} + z_{\alpha})}
+        )
+    \]
+
+    and
+
+    \[
+        \alpha_u = \phi(
+            \hat{z_0} + \frac{
+                \hat{z_0} + z_{1 - \alpha}
+            }{
+                1 - \hat{a}(\hat{z} + z_{1-\alpha})
+            }
+        )
+    \]
+
+    Then the "BCa" or "Bias-Corrected and Accelerated" interval is
+
+    \[
+        \text{percentile}(\hat{\theta}^{*}, \alpha_l),
+        \text{percentile}(\hat{\theta}^{*}, \alpha_u)
+    \]
+
+    where \( \hat{\theta}^{*} \) is the vector of bootstrap statistics.
 
     Parameters
     ----------
