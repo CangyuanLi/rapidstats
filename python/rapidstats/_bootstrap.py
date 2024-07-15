@@ -20,6 +20,7 @@ from ._rustystats import (
     _bootstrap_roc_auc,
     _bootstrap_root_mean_squared_error,
     _percentile_interval,
+    _standard_interval,
 )
 from ._utils import (
     _regression_to_df,
@@ -118,11 +119,19 @@ def _jacknife(
 
 
 class Bootstrap:
-    """Computes a two-sided bootstrap confidence interval of a statistic. The
+    r"""Computes a two-sided bootstrap confidence interval of a statistic. The
     process is as follows:
 
     1. Resample 100% of the data with replacement for `iterations`
     2. Compute the statistic on each resample
+
+    If the method is `standard`, we stop here and compute the interval as
+
+    \[ \hat{\theta} \pm z \times \hat{se} \]
+
+    where \( \hat{\theta} \) is the bootstrap mean, \( z \) is the Z-score determined
+    by \( \alpha = \frac{1 - \text{confidence}}{2} \). \( \hat{se} \) is the bootstrap
+    standard error yielded by \( \frac{\hat{\sigma}}{\sqrt{N}} \).
 
     If the method is `percentile`, we stop here and compute the interval of the
     bootstrap distribution that is symmetric about the median and contains
@@ -146,7 +155,7 @@ class Bootstrap:
         How many times to resample the data, by default 1_000
     confidence : float, optional
         The confidence level, by default 0.95
-    method : Literal["percentile", "basic", "BCa"], optional
+    method : Literal["standard", "percentile", "basic", "BCa"], optional
         Whether to return the Percentile, Basic / Reverse Percentile, or
         Bias Corrected and Accelerated Interval, by default "percentile"
     seed : Optional[int], optional
@@ -156,7 +165,7 @@ class Bootstrap:
     Raises
     ------
     ValueError
-        If the method is not one of `percentile`, `basic`, or `BCa`
+        If the method is not one of `standard`, `percentile`, `basic`, or `BCa`
 
     Examples
     --------
@@ -171,12 +180,12 @@ class Bootstrap:
         self,
         iterations: int = 1_000,
         confidence: float = 0.95,
-        method: Literal["percentile", "basic", "BCa"] = "percentile",
+        method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
         seed: Optional[int] = None,
     ) -> None:
-        if method not in ("percentile", "basic", "BCa"):
+        if method not in ("standard", "percentile", "basic", "BCa"):
             raise ValueError(
-                f"Invalid confidence interval method `{method}`, only `percentile`, `basic`, and `BCa` are supported",
+                f"Invalid confidence interval method `{method}`, only `standard`, `percentile`, `basic`, and `BCa` are supported",
             )
 
         self.iterations = iterations
@@ -230,7 +239,9 @@ class Bootstrap:
         if len(bootstrap_stats) == 0:
             return (math.nan, math.nan, math.nan)
 
-        if self.method == "percentile":
+        if self.method == "standard":
+            return _standard_interval(bootstrap_stats, self.alpha)
+        elif self.method == "percentile":
             return _percentile_interval(bootstrap_stats, self.alpha)
         elif self.method == "basic":
             original_stat = stat_func(df)

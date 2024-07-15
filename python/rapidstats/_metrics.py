@@ -291,7 +291,7 @@ def mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
 def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     r"""Computes Root Mean Squared Error (RMSE) as
 
-    \[ \sqrt{\frac{1}{N} \sum_{1}^{N} (yt_i - ys_i)^2} \]
+    \[ \sqrt{\frac{1}{N} \sum_{i=1}^{N} (yt_i - ys_i)^2} \]
 
     where \( yt \) is `y_true` and \( ys \) is `y_score`.
 

@@ -1,5 +1,5 @@
 use crate::bootstrap;
-use ndarray::{s, ArrayView1, Data};
+use ndarray::{s, ArrayView1};
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];

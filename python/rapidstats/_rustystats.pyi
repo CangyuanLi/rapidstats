@@ -3,7 +3,7 @@ from typing import Literal, Optional
 import polars as pl
 
 ConfidenceInterval = tuple[float, float, float]
-BootstrapMethod = Literal["percentile", "basic", "BCa"]
+BootstrapMethod = Literal["standard", "percentile", "basic", "BCa"]
 
 def _confusion_matrix(df: pl.DataFrame) -> list[float]: ...
 def _bootstrap_confusion_matrix(

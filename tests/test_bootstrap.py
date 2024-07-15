@@ -7,9 +7,33 @@ import rapidstats
 
 np.random.seed(208)
 
+N = 1_000
+CONFIDENCE_LEVEL = 0.95
+ALPHA = (1 - CONFIDENCE_LEVEL) / 2
+BOOTSTRAP_STATS = np.random.uniform(size=N)
+
 
 def _alpha(confidence_level: float) -> float:
     return (1 - confidence_level) / 2
+
+
+def reference_standard_interval(bootstrap_stats, confidence_level):
+    alpha = _alpha(confidence_level)
+
+    mean = np.mean(bootstrap_stats)
+    stdev = np.std(bootstrap_stats)
+    stderr = stdev / np.sqrt(len(bootstrap_stats))
+    z = scipy.stats.norm.ppf(1 - alpha)
+    x = z * stderr
+
+    return (mean - x, mean + x)
+
+
+def test_standard_interval():
+    rs = rapidstats._bootstrap._standard_interval(BOOTSTRAP_STATS, ALPHA)
+    ref = reference_standard_interval(BOOTSTRAP_STATS, CONFIDENCE_LEVEL)
+
+    pytest.approx(rs) == ref
 
 
 def reference_percentile_interval(bootstrap_stats, confidence_level):

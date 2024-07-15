@@ -28,7 +28,10 @@ macro_rules! generate_functions {
                 let df: DataFrame = df.into();
                 let bootstrap_stats =
                     bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
-                if method == "percentile" {
+                if method == "standard" {
+                    Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
+                }
+                else if method == "percentile" {
                     Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
                 } else if method == "basic" {
                     let original_stat = $metric_func(df.clone());
@@ -83,6 +86,11 @@ generate_functions!(_mean, metrics::mean);
 generate_functions!(_adverse_impact_ratio, metrics::adverse_impact_ratio);
 generate_functions!(_mean_squared_error, metrics::mean_squared_error);
 generate_functions!(_root_mean_squared_error, metrics::root_mean_squared_error);
+
+#[pyfunction]
+fn _standard_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
+}
 
 #[pyfunction]
 fn _percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
@@ -146,6 +154,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_mean_squared_error, m)?)?;
     m.add_function(wrap_pyfunction!(_root_mean_squared_error, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_root_mean_squared_error, m)?)?;
+    m.add_function(wrap_pyfunction!(_standard_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_percentile_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_basic_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;

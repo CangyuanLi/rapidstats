@@ -108,6 +108,16 @@ pub fn run_jacknife<T: Send + Sync>(df: DataFrame, func: fn(DataFrame) -> T) -> 
     jacknife_stats
 }
 
+pub fn standard_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceInterval {
+    let runs = bootstrap_stats.drop_nans();
+    let mean = runs.mean();
+    let stderr = runs.std() / ((runs.len() as f64).sqrt());
+    let z = distributions::norm_ppf(1.0 - alpha);
+    let x = z * stderr;
+
+    (mean - x, mean, mean + x)
+}
+
 pub fn percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceInterval {
     let runs = bootstrap_stats.drop_nans();
     let mean = runs.mean();
