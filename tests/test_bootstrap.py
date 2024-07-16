@@ -22,7 +22,7 @@ def reference_standard_interval(bootstrap_stats, confidence_level):
 
     mean = np.mean(bootstrap_stats)
     stdev = np.std(bootstrap_stats)
-    stderr = stdev / np.sqrt(len(bootstrap_stats))
+    stderr = stdev
     z = scipy.stats.norm.ppf(1 - alpha)
     x = z * stderr
 
