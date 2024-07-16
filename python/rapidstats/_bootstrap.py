@@ -140,7 +140,7 @@ class Bootstrap:
 
     where \( \phi^{-1} \) is the quantile, inverse CDF, or percent-point function
 
-    Then the "Standard" interval is
+    Then the "Standard" or "First-Order Normal Approximation" interval is
 
     \[ \hat{\theta} \pm z_{\alpha} \times \hat{se} \]
 
