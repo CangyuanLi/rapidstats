@@ -240,6 +240,12 @@ class Bootstrap:
     seed : Optional[int], optional
         Seed that controls resampling. Set this to any integer to make results
         reproducible, by default None
+    n_jobs: Optional[int], optional
+        How many threads to run with. None means let the executor decide, and 1 means
+        run sequentially, by default None
+    chunksize: Union[Literal["auto"], Optional[int]], optional
+        The chunksize for each thread. "auto" means let the class decide for each
+        function and None means let the executor decide, by default "auto"
 
     Raises
     ------
