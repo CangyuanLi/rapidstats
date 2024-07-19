@@ -24,10 +24,12 @@ macro_rules! generate_functions {
                 alpha: f64,
                 method: &str,
                 seed: Option<u64>,
+                n_jobs: Option<usize>,
+                chunksize: Option<usize>,
             ) -> PyResult<bootstrap::ConfidenceInterval> {
                 let df: DataFrame = df.into();
                 let bootstrap_stats =
-                    bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func);
+                    bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func, n_jobs, chunksize);
                 if method == "standard" {
                     Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
                 }
@@ -71,11 +73,13 @@ fn _bootstrap_confusion_matrix(
     alpha: f64,
     method: &str,
     seed: Option<u64>,
+    n_jobs: Option<usize>,
+    chunksize: Option<usize>,
 ) -> PyResult<Vec<bootstrap::ConfidenceInterval>> {
     let df: DataFrame = df.into();
 
     Ok(metrics::bootstrap_confusion_matrix(
-        df, iterations, alpha, method, seed,
+        df, iterations, alpha, method, seed, n_jobs, chunksize,
     ))
 }
 

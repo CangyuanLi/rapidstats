@@ -157,7 +157,9 @@ def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
     float
         ROC-AUC
     """
-    df = _y_true_y_score_to_df(y_true, y_score)
+    df = _y_true_y_score_to_df(y_true, y_score).with_columns(
+        pl.col("y_true").cast(pl.Float64)
+    )
 
     return _roc_auc(df)
 

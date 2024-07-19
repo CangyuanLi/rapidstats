@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import math
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal, Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
@@ -261,6 +261,8 @@ class Bootstrap:
         confidence: float = 0.95,
         method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
         seed: Optional[int] = None,
+        n_jobs: Optional[int] = None,
+        chunksize: Union[Literal["auto"], Optional[int]] = "auto",
     ) -> None:
         if method not in ("standard", "percentile", "basic", "BCa"):
             raise ValueError(
@@ -272,13 +274,28 @@ class Bootstrap:
         self.seed = seed
         self.alpha = (1 - confidence) / 2
         self.method = method
+        self.n_jobs = n_jobs
+        self.chunksize = chunksize
 
         self._params = {
             "iterations": self.iterations,
             "alpha": self.alpha,
             "method": self.method,
             "seed": self.seed,
+            "n_jobs": self.n_jobs,
+            "chunksize": self.chunksize,
         }
+
+    def _get_params(self, **kwargs) -> dict:
+        params = self._params.copy()
+        if params["chunksize"] == "auto":
+            params["chunksize"] = None
+
+        if kwargs:
+            for k, v in kwargs.items():
+                params[k] = v
+
+        return params
 
     def run(
         self, df: pl.DataFrame, stat_func: StatFunc, **kwargs
@@ -357,10 +374,15 @@ class Bootstrap:
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
-            *_bootstrap_confusion_matrix(df, **self._params)
+            *_bootstrap_confusion_matrix(df, **self._get_params())
         )
 
-    def roc_auc(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+    def roc_auc(
+        self,
+        y_true: ArrayLike,
+        y_score: ArrayLike,
+        **kwargs,
+    ) -> ConfidenceInterval:
         """Bootstrap ROC-AUC. See [rapidstats.roc_auc][] for more details.
 
         Parameters
@@ -375,9 +397,14 @@ class Bootstrap:
         ConfidenceInterval
             A tuple of (lower, mean, upper)
         """
-        df = _y_true_y_score_to_df(y_true, y_score)
+        df = _y_true_y_score_to_df(y_true, y_score).with_columns(
+            pl.col("y_true").cast(pl.Float64)
+        )
 
-        return _bootstrap_roc_auc(df, **self._params)
+        if self.chunksize == "auto" and "chunksize" not in kwargs:
+            kwargs["chunksize"] = 8
+
+        return _bootstrap_roc_auc(df, **self._get_params(**kwargs))
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
         """Bootstrap Max-KS. See [rapidstats.max_ks][] for more details.
@@ -396,7 +423,7 @@ class Bootstrap:
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
-        return _bootstrap_max_ks(df, **self._params)
+        return _bootstrap_max_ks(df, **self._get_params())
 
     def brier_loss(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
         """Bootstrap Brier loss. See [rapidstats.brier_loss][] for more details.
@@ -415,7 +442,7 @@ class Bootstrap:
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
-        return _bootstrap_brier_loss(df, **self._params)
+        return _bootstrap_brier_loss(df, **self._get_params())
 
     def mean(self, y: ArrayLike) -> ConfidenceInterval:
         """Bootstrap mean.
@@ -432,7 +459,7 @@ class Bootstrap:
         """
         df = pl.DataFrame({"y": y})
 
-        return _bootstrap_mean(df, **self._params)
+        return _bootstrap_mean(df, **self._get_params())
 
     def adverse_impact_ratio(
         self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
@@ -457,7 +484,7 @@ class Bootstrap:
             {"y_pred": y_pred, "protected": protected, "control": control}
         ).cast(pl.Boolean)
 
-        return _bootstrap_adverse_impact_ratio(df, **self._params)
+        return _bootstrap_adverse_impact_ratio(df, **self._get_params())
 
     def mean_squared_error(self, y_true: ArrayLike, y_score: ArrayLike) -> float:
         r"""Bootstrap MSE. See [rapidstats.mean_squared_error][] for more details.

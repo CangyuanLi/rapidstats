@@ -1,5 +1,4 @@
 use crate::bootstrap;
-use ndarray::{s, ArrayView1};
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
@@ -124,11 +123,19 @@ pub fn bootstrap_confusion_matrix(
     alpha: f64,
     method: &str,
     seed: Option<u64>,
+    n_jobs: Option<usize>,
+    chunksize: Option<usize>,
 ) -> Vec<bootstrap::ConfidenceInterval> {
     let base_cm = base_confusion_matrix(df);
 
-    let bootstrap_stats =
-        bootstrap::run_bootstrap(base_cm.clone(), iterations, seed, confusion_matrix);
+    let bootstrap_stats = bootstrap::run_bootstrap(
+        base_cm.clone(),
+        iterations,
+        seed,
+        confusion_matrix,
+        n_jobs,
+        chunksize,
+    );
     let bs_transposed = transpose_confusion_matrix_results(bootstrap_stats);
 
     if method == "percentile" {
@@ -160,54 +167,20 @@ pub fn bootstrap_confusion_matrix(
     }
 }
 
-// AUC code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/num/tp_fp.rs
-
-fn trapz(y: ArrayView1<f64>, x: ArrayView1<f64>) -> f64 {
-    let y_s = &y.slice(s![1..]) + &y.slice(s![..-1]);
-    let x_d = &x.slice(s![1..]) - &x.slice(s![..-1]);
-
-    0.5 * (x_d.into_iter().zip(y_s).fold(0., |acc, (x, y)| acc + x * y))
-}
-
 pub fn roc_auc(df: DataFrame) -> f64 {
-    let positive_counts = df["y_true"].sum::<u32>().unwrap_or(0);
-    if positive_counts == 0 {
-        return f64::NAN;
-    }
-    let n = df.height() as u32;
+    let df = df.sort(["y_score"], Default::default()).unwrap();
+    let y_true = df["y_true"].f64().unwrap();
 
-    let mut binding = df
-        .lazy()
-        .group_by([col("y_score")])
-        .agg([
-            len().alias("cnt"),
-            col("y_true").sum().alias("pos_cnt_at_threshold"),
-        ])
-        .sort(["y_score"], Default::default())
-        .with_columns([
-            (lit(n) - col("cnt").cum_sum(false) + col("cnt")).alias("predicted_positive"),
-            (lit(positive_counts) - col("pos_cnt_at_threshold").cum_sum(false))
-                .shift_and_fill(1, positive_counts)
-                .alias("tp"),
-        ])
-        .with_column((col("predicted_positive") - col("tp")).alias("fp"))
-        .with_columns([
-            col("tp").cast(DataType::Float64),
-            col("fp").cast(DataType::Float64),
-        ])
-        .select([
-            (col("tp") / col("tp").first()).alias("tpr"),
-            (col("fp") / col("fp").first()).alias("fpr"),
-        ])
-        .collect()
-        .unwrap();
+    let n = y_true.len() as f64;
+    let (auc, nfalse) = y_true
+        .into_no_null_iter()
+        .fold((0.0, 0.0), |(auc, nfalse), y_i| {
+            let new_nfalse = nfalse + (1.0 - y_i);
+            let new_auc = auc + y_i * new_nfalse;
+            (new_auc, new_nfalse)
+        });
 
-    let aligned = binding.as_single_chunk();
-
-    -trapz(
-        aligned["tpr"].f64().unwrap().to_ndarray().unwrap(),
-        aligned["fpr"].f64().unwrap().to_ndarray().unwrap(),
-    )
+    auc / (nfalse * (n - nfalse))
 }
 
 // Max KS code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/stats/ks.rs

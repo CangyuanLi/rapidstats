@@ -1,5 +1,6 @@
 use polars::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
 
 use crate::distributions;
 
@@ -76,23 +77,101 @@ impl VecUtils for Vec<f64> {
     }
 }
 
+// fn _compare(
+//     arr1: Vec<&str>,
+//     arr2: Vec<&str>,
+//     func_name: &str,
+//     n_jobs: usize,
+//     quiet: bool,
+// ) -> PyResult<Vec<f64>> {
+//     let func = func_dispatcher(func_name);
+
+//     let arr1 = arr1.as_slice();
+//     let arr2 = arr2.as_slice();
+
+//     if n_jobs == 0 {
+//         Ok(fuzzycompare(arr1, arr2, func, quiet))
+//     } else if n_jobs == 1 {
+//         Ok(fuzzycompare_sequential(arr1, arr2, func, quiet))
+//     } else {
+//         Ok(utils::create_rayon_pool(n_jobs)?.install(|| fuzzycompare(arr1, arr2, func, quiet)))
+//     }
+// }
+
+fn create_rayon_pool(n_jobs: usize) -> rayon::ThreadPool {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(n_jobs)
+        .build()
+        .unwrap()
+}
+
+fn bootstrap_core<T: Send + Sync>(
+    df: DataFrame,
+    iterations: u64,
+    seed: Option<u64>,
+    func: fn(DataFrame) -> T,
+    chunksize: Option<usize>,
+) -> Vec<T> {
+    let df_height = df.height();
+
+    let seeds: Vec<u64> = (0..iterations).collect();
+
+    let res: Vec<T> = if chunksize.is_none() {
+        seeds
+            .par_iter()
+            .map(|i| {
+                func(
+                    df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
+                        .unwrap(),
+                )
+            })
+            .collect()
+    } else {
+        let chunksize = chunksize.unwrap();
+        seeds
+            .par_chunks(chunksize)
+            .flat_map(|chunk| {
+                chunk
+                    .iter()
+                    .map(|&i| {
+                        func(
+                            df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
+                                .unwrap(),
+                        )
+                    })
+                    .collect::<Vec<T>>()
+            })
+            .collect()
+    };
+
+    res
+}
+
 pub fn run_bootstrap<T: Send + Sync>(
     df: DataFrame,
     iterations: u64,
     seed: Option<u64>,
     func: fn(DataFrame) -> T,
+    n_jobs: Option<usize>,
+    chunksize: Option<usize>,
 ) -> Vec<T> {
     let df_height = df.height();
 
-    let bootstrap_stats: Vec<T> = (0..iterations)
-        .into_par_iter()
-        .map(|i| {
-            func(
-                df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
-                    .unwrap(),
-            )
-        })
-        .collect();
+    let bootstrap_stats: Vec<T> = if n_jobs == Some(1) {
+        (0..iterations)
+            .map(|i| {
+                func(
+                    df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
+                        .unwrap(),
+                )
+            })
+            .collect()
+    } else if n_jobs.is_none() {
+        bootstrap_core(df, iterations, seed, func, chunksize)
+    } else {
+        create_rayon_pool(n_jobs.unwrap())
+            .install(|| bootstrap_core(df, iterations, seed, func, chunksize))
+    };
 
     bootstrap_stats
 }
