@@ -1,5 +1,5 @@
 import itertools
-from typing import Union
+from typing import Optional, Union
 
 import polars as pl
 import polars.selectors as cs
@@ -38,8 +38,8 @@ def _to_polars(
 
 def correlation_matrix(
     data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
-    l1: list[str] = None,
-    l2: list[str] = None,
+    l1: Optional[list[str]] = None,
+    l2: Optional[list[str]] = None,
     method: CorrelationMethod = "pearson",
 ) -> pl.DataFrame:
     """
