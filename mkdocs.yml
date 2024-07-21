@@ -33,6 +33,9 @@ markdown_extensions:
       check_paths: true
   - pymdownx.arithmatex:
       generic: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
 
 extra_javascript:
   - javascripts/mathjax.js
