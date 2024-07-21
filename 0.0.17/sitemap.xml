@@ -16,6 +16,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://cangyuanli.github.io/rapidstats/0.0.17/distributions.html</loc>
+         <lastmod>2024-07-21</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://cangyuanli.github.io/rapidstats/0.0.17/metrics.html</loc>
          <lastmod>2024-07-21</lastmod>
          <changefreq>daily</changefreq>
