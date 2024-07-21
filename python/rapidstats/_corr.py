@@ -42,8 +42,17 @@ def correlation_matrix(
     l2: list[str] = None,
     method: CorrelationMethod = "pearson",
 ) -> pl.DataFrame:
-    """Compute the correlation matrix between two lists of columns. If both lists are
-    None, then the correlation matrix is over all columns in the input DataFrame.
+    """
+    !!! warning
+
+        If you know that your data has no nulls, you should use `np.corrcoef` instead.
+        While this function will return the correct result and is reasonably fast,
+        computing the null-aware correlation matrix will always be slower than assuming
+        that there are no nulls.
+
+    Compute the null-aware correlation matrix between two lists of columns. If both
+    lists are None, then the correlation matrix is over all columns in the input
+    DataFrame.
 
     Parameters
     ----------
@@ -64,7 +73,7 @@ def correlation_matrix(
     pl.DataFrame
         A correlation matrix with `l1` as the columns and `l2` as the rows
     """
-    pf = _to_polars(data)
+    pf = _to_polars(data).fill_nan(None)  # pl.corr works with nulls but NOT NaNs
 
     if l1 is None and l2 is None:
         original = pf.select(cs.numeric() | cs.boolean()).columns
@@ -84,7 +93,7 @@ def correlation_matrix(
         .select(original)
         .rename({old: new for old, new in zip(original, new_columns)})
         .select(_corr_expr(c1, c2, method=method) for c1, c2 in combinations)
-        .melt()
+        .unpivot()
         .with_columns(pl.col("variable").str.split("_"))
         .with_columns(
             pl.col("variable").list.get(0).alias("c1"),
@@ -92,7 +101,7 @@ def correlation_matrix(
         )
         .drop("variable")
         .collect()
-        .pivot(index="c2", columns="c1", values="value")
+        .pivot(index="c2", on="c1", values="value")
         .drop("c2")
     )
 
