@@ -1675,12 +1675,12 @@ matrix metrics and their formulas.</p>
 ground truth positive and ground truth negative classes. The KS test measures the
 highest distance between two CDFs, so the Max-KS metric measures how well the model
 separates two classes. In pseucode:</p>
-<pre><code class="language-py">df = Frame(y_true, y_score)
-class0 = df.filter(~y_true)[&quot;y_score&quot;]
-class1 = df.filter(y_true)[&quot;y_score&quot;]
+<div class="highlight"><pre><span></span><code><span class="n">df</span> <span class="o">=</span> <span class="n">Frame</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_score</span><span class="p">)</span>
+<span class="n">class0</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">~</span><span class="n">y_true</span><span class="p">)[</span><span class="s2">&quot;y_score&quot;</span><span class="p">]</span>
+<span class="n">class1</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">y_true</span><span class="p">)[</span><span class="s2">&quot;y_score&quot;</span><span class="p">]</span>
 
-ks(class0, class1)
-</code></pre>
+<span class="n">ks</span><span class="p">(</span><span class="n">class0</span><span class="p">,</span> <span class="n">class1</span><span class="p">)</span>
+</code></pre></div>
 
 
 

@@ -893,10 +893,10 @@ function and None means let the executor decide, by default "auto"</p>
 
 
 <p><strong>Examples:</strong></p>
-    <pre><code class="language-py">import rapidstats
-ci = rapidstats.Bootstrap(seed=208).mean([1, 2, 3])
-</code></pre>
-<p>(1.0, 1.9783333333333328, 3.0)</p>
+    <p><div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">rapidstats</span>
+<span class="n">ci</span> <span class="o">=</span> <span class="n">rapidstats</span><span class="o">.</span><span class="n">Bootstrap</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">208</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+</code></pre></div>
+(1.0, 1.9783333333333328, 3.0)</p>
 
             <details class="quote">
               <summary>Source code in <code>python/rapidstats/_bootstrap.py</code></summary>
