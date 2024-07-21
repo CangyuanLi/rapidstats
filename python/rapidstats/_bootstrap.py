@@ -355,6 +355,10 @@ class Bootstrap:
             return _bca_interval(
                 original_stat, bootstrap_stats, jacknife_stats, self.alpha
             )
+        else:
+            # We shouldn't hit this since we check method in __init__, but it makes the
+            # type-checker happy
+            raise ValueError("Invalid method")
 
     def confusion_matrix(
         self,
@@ -492,7 +496,9 @@ class Bootstrap:
 
         return _bootstrap_adverse_impact_ratio(df, **self._get_params())
 
-    def mean_squared_error(self, y_true: ArrayLike, y_score: ArrayLike) -> float:
+    def mean_squared_error(
+        self, y_true: ArrayLike, y_score: ArrayLike
+    ) -> ConfidenceInterval:
         r"""Bootstrap MSE. See [rapidstats.mean_squared_error][] for more details.
 
         Parameters
@@ -511,7 +517,9 @@ class Bootstrap:
             _regression_to_df(y_true, y_score), **self._params
         )
 
-    def root_mean_squared_error(self, y_true: ArrayLike, y_score: ArrayLike) -> float:
+    def root_mean_squared_error(
+        self, y_true: ArrayLike, y_score: ArrayLike
+    ) -> ConfidenceInterval:
         r"""Bootstrap RMSE. See [rapidstats.root_mean_squared_error][] for more details.
 
         Parameters

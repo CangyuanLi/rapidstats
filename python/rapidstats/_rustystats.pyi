@@ -69,6 +69,9 @@ def _bootstrap_root_mean_squared_error(
     method: BootstrapMethod,
     seed: Optional[int],
 ) -> ConfidenceInterval: ...
+def _standard_interval(
+    bootstrap_stats: list[float], alpha: float
+) -> ConfidenceInterval: ...
 def _percentile_interval(
     bootstrap_stats: list[float], alpha: float
 ) -> ConfidenceInterval: ...

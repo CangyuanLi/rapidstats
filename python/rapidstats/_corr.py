@@ -13,13 +13,13 @@ def _pairs(l1, l2) -> list[tuple]:
     return [(x, y) for x in l1 for y in l2]
 
 
-def _corr_expr(c1, c2, method: CorrelationMethod):
+def _corr_expr(c1, c2, method: CorrelationMethod) -> pl.Expr:
     return pl.corr(c1, c2, method=method).alias(f"{c1}_{c2}")
 
 
 def _to_polars(
     data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
-) -> pl.DataFrame:
+) -> Union[pl.LazyFrame, pl.DataFrame]:
     if isinstance(data, pl.DataFrame):
         return data
     elif isinstance(data, pl.LazyFrame):
@@ -82,6 +82,9 @@ def correlation_matrix(
         l1 = original[:-1]
         l2 = original[1:]
     else:
+        assert l1 is not None
+        assert l2 is not None
+
         new_l1 = [f"l{i}" for i, _ in enumerate(l1)]
         new_l2 = [f"r{i}" for i, _ in enumerate(l2)]
         new_columns = new_l1 + new_l2
