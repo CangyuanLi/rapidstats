@@ -8,6 +8,7 @@ nav:
 - Home: index.md
 - Bootstrap: bootstrap.md
 - Correlation: correlation.md
+- Distributions: distributions.md
 - Metrics: metrics.md
 
 theme:
