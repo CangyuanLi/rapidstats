@@ -73,10 +73,11 @@ def correlation_matrix(
     pl.DataFrame
         A correlation matrix with `l1` as the columns and `l2` as the rows
     """
-    pf = _to_polars(data).fill_nan(None)  # pl.corr works with nulls but NOT NaNs
+    # pl.corr works with nulls but NOT NaNs
+    pf = _to_polars(data).select(cs.numeric() | cs.boolean()).fill_nan(None)
 
     if l1 is None and l2 is None:
-        original = pf.select(cs.numeric() | cs.boolean()).columns
+        original = pf.columns
         new_columns = [f"{i}" for i, _ in enumerate(original)]
         combinations = itertools.combinations(new_columns, r=2)
         l1 = original[:-1]
@@ -84,6 +85,9 @@ def correlation_matrix(
     else:
         assert l1 is not None
         assert l2 is not None
+        valid_cols = set(pf.columns)
+        l1 = [c for c in l1 if c in valid_cols]
+        l2 = [c for c in l2 if c in valid_cols]
 
         new_l1 = [f"l{i}" for i, _ in enumerate(l1)]
         new_l2 = [f"r{i}" for i, _ in enumerate(l2)]

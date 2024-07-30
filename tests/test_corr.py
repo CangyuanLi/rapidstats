@@ -46,3 +46,18 @@ def test_correlation_matrix():
     rs = rapidstats.correlation_matrix(DF).drop("").to_numpy()
 
     assert np.allclose(ref, rs, equal_nan=True)
+
+
+def test_correlation_matrix_filter():
+    df = pl.DataFrame(
+        {
+            "a": ["x", "y", "z"],
+            "b": [1, 2, 3],
+            "c": [4, 5, 6],
+            "d": [7, 8, 9],
+        }
+    )
+
+    rapidstats.correlation_matrix(df)
+
+    rapidstats.correlation_matrix(df, ["a", "b"], ["c", "d"])
