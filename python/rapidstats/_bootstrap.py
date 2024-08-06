@@ -243,9 +243,9 @@ class Bootstrap:
     n_jobs: Optional[int], optional
         How many threads to run with. None means let the executor decide, and 1 means
         run sequentially, by default None
-    chunksize: Union[Literal["auto"], Optional[int]], optional
-        The chunksize for each thread. "auto" means let the class decide for each
-        function and None means let the executor decide, by default "auto"
+    chunksize: Optional[int], optional
+        The chunksize for each thread. None means let the executor decide, by default
+        None
 
     Raises
     ------
@@ -268,7 +268,7 @@ class Bootstrap:
         method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
         seed: Optional[int] = None,
         n_jobs: Optional[int] = None,
-        chunksize: Union[Literal["auto"], Optional[int]] = "auto",
+        chunksize: Optional[int] = None,
     ) -> None:
         if method not in ("standard", "percentile", "basic", "BCa"):
             raise ValueError(
@@ -291,17 +291,6 @@ class Bootstrap:
             "n_jobs": self.n_jobs,
             "chunksize": self.chunksize,
         }
-
-    def _get_params(self, **kwargs) -> dict:
-        params = self._params.copy()
-        if params["chunksize"] == "auto":
-            params["chunksize"] = None
-
-        if kwargs:
-            for k, v in kwargs.items():
-                params[k] = v
-
-        return params
 
     def run(
         self, df: pl.DataFrame, stat_func: StatFunc, **kwargs
@@ -384,14 +373,13 @@ class Bootstrap:
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
-            *_bootstrap_confusion_matrix(df, **self._get_params())
+            *_bootstrap_confusion_matrix(df, **self._params)
         )
 
     def roc_auc(
         self,
         y_true: ArrayLike,
         y_score: ArrayLike,
-        **kwargs,
     ) -> ConfidenceInterval:
         """Bootstrap ROC-AUC. See [rapidstats.roc_auc][] for more details.
 
@@ -411,10 +399,7 @@ class Bootstrap:
             pl.col("y_true").cast(pl.Float64)
         )
 
-        if self.chunksize == "auto" and "chunksize" not in kwargs:
-            kwargs["chunksize"] = 8
-
-        return _bootstrap_roc_auc(df, **self._get_params(**kwargs))
+        return _bootstrap_roc_auc(df, **self._params)
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
         """Bootstrap Max-KS. See [rapidstats.max_ks][] for more details.
@@ -433,7 +418,7 @@ class Bootstrap:
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
-        return _bootstrap_max_ks(df, **self._get_params())
+        return _bootstrap_max_ks(df, **self._params)
 
     def brier_loss(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
         """Bootstrap Brier loss. See [rapidstats.brier_loss][] for more details.
@@ -452,7 +437,7 @@ class Bootstrap:
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
-        return _bootstrap_brier_loss(df, **self._get_params())
+        return _bootstrap_brier_loss(df, **self._params)
 
     def mean(self, y: ArrayLike) -> ConfidenceInterval:
         """Bootstrap mean.
@@ -469,7 +454,7 @@ class Bootstrap:
         """
         df = pl.DataFrame({"y": y})
 
-        return _bootstrap_mean(df, **self._get_params())
+        return _bootstrap_mean(df, **self._params)
 
     def adverse_impact_ratio(
         self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
@@ -494,7 +479,7 @@ class Bootstrap:
             {"y_pred": y_pred, "protected": protected, "control": control}
         ).cast(pl.Boolean)
 
-        return _bootstrap_adverse_impact_ratio(df, **self._get_params())
+        return _bootstrap_adverse_impact_ratio(df, **self._params)
 
     def mean_squared_error(
         self, y_true: ArrayLike, y_score: ArrayLike
