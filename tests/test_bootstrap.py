@@ -131,3 +131,20 @@ def test_bca_interval():
 
     for a, b in zip(rs, ref):
         assert pytest.approx(a, rel=1e-5) == b
+
+
+def test_bootstrap_succesfully_runs():
+    bs = rapidstats.Bootstrap(iterations=10)
+    y_true_score = np.random.rand(100)
+    y_true = y_true_score >= 0.5
+    y_score = np.random.rand(100)
+    y_pred = y_score >= 0.5
+
+    bs.roc_auc(y_true, y_score)
+    bs.brier_loss(y_true, y_score)
+    bs.mean(y_score)
+    bs.confusion_matrix(y_true, y_pred)
+    bs.adverse_impact_ratio(y_pred, y_true, y_score <= 0.5)
+    bs.max_ks(y_true, y_score)
+    bs.mean_squared_error(y_true_score, y_score)
+    bs.root_mean_squared_error(y_true_score, y_score)
