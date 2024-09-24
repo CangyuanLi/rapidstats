@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -46,6 +48,44 @@ def test_correlation_matrix():
     rs = rapidstats.correlation_matrix(DF).drop("").to_numpy()
 
     assert np.allclose(ref, rs, equal_nan=True)
+
+
+def test_correlation_matrix_combinations():
+    # Test if user passes in combinations directly
+
+    # Reference
+    combinations = list(itertools.combinations(DF.columns, r=2))[:5]
+    ref_corr_mats = []
+    for a, b in combinations:
+        x = (
+            pd.DataFrame({a: DF[a], b: DF[b]})
+            .corr()
+            .reset_index()
+            .melt("index")
+            .rename(columns={"index": "col1", "variable": "col2", "value": "ref"})
+        )
+        x = x.loc[(x["col1"] == b) & (x["col2"] == a)]
+
+        ref_corr_mats.append(x)
+
+    ref_corr_mat = pd.concat(ref_corr_mats, axis=0)
+
+    corr_mat = (
+        rapidstats.correlation_matrix(DF, combinations)
+        .unpivot(index="")
+        .rename({"": "col1", "variable": "col2"})
+        .filter(pl.col("col1") != pl.col("col2"))
+    )
+
+    assert ref_corr_mat.shape == corr_mat.shape
+
+    res = corr_mat.join(
+        pl.from_pandas(ref_corr_mat), on=["col1", "col2"], how="inner", validate="1:1"
+    )
+
+    assert res.height == corr_mat.height
+
+    assert np.allclose(res["ref"], res["value"])
 
 
 def test_correlation_matrix_filter():

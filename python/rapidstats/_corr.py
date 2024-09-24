@@ -38,7 +38,7 @@ def _to_polars(
 
 def correlation_matrix(
     data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
-    l1: Optional[list[str]] = None,
+    l1: Optional[Union[list[str], list[tuple[str, str]]]] = None,
     l2: Optional[list[str]] = None,
     method: CorrelationMethod = "pearson",
 ) -> pl.DataFrame:
@@ -52,14 +52,15 @@ def correlation_matrix(
 
     Compute the null-aware correlation matrix between two lists of columns. If both
     lists are None, then the correlation matrix is over all columns in the input
-    DataFrame.
+    DataFrame. If `l1` is not None, and is a list of 2-tuples, `l1` is interpreted
+    as the combinations of columns to compute the correlation for.
 
     Parameters
     ----------
     data : Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
         The input DataFrame. It must be either a Polars Frame or something convertible
         to a Polars Frame.
-    l1 : list[str], optional
+    l1 : Union[list[str], list[tuple[str, str]]], optional
         A list of columns to appear as the columns of the correlation matrix,
         by default None
     l2 : list[str], optional
@@ -82,6 +83,20 @@ def correlation_matrix(
         combinations = itertools.combinations(new_columns, r=2)
         l1 = original[:-1]
         l2 = original[1:]
+    elif l1 is not None and l2 is None:
+        # In this case the user should pass in the combinations directly as a list of
+        # 2-tuples.
+        original = set()
+        for a, b in l1:
+            original.add(a)
+            original.add(b)
+        original = list(original)
+        mapper = {name: f"{i}" for i, name in enumerate(original)}
+        combinations = [(mapper[a], mapper[b]) for a, b in l1]
+        new_columns = list(mapper.values())
+
+        l1 = original
+        l2 = original
     else:
         assert l1 is not None
         assert l2 is not None
@@ -95,10 +110,13 @@ def correlation_matrix(
         combinations = _pairs(new_l1, new_l2)
         original = l1 + l2
 
+    old_to_new_mapper = {old: new for old, new in zip(original, new_columns)}
+    new_to_old_mapper = {new: old for new, old in zip(new_columns, original)}
+
     corr_mat = (
         pf.lazy()
         .select(original)
-        .rename({old: new for old, new in zip(original, new_columns)})
+        .rename(old_to_new_mapper)
         .select(_corr_expr(c1, c2, method=method) for c1, c2 in combinations)
         .unpivot()
         .with_columns(pl.col("variable").str.split("_"))
@@ -109,10 +127,19 @@ def correlation_matrix(
         .drop("variable")
         .collect()
         .pivot(index="c2", on="c1", values="value")
-        .drop("c2")
     )
 
-    corr_mat.columns = l1
-    corr_mat = corr_mat.with_columns(pl.Series("", l2)).select("", *l1)
+    new_row_names = corr_mat["c2"]
+    corr_mat = corr_mat.drop("c2")
+
+    # Set the column names
+    valid_old_names = [new_to_old_mapper[c] for c in corr_mat.columns]
+    corr_mat.columns = valid_old_names
+
+    # Set the row names
+    valid_old_row_names = [new_to_old_mapper[c] for c in new_row_names]
+    corr_mat = corr_mat.with_columns(pl.Series("", valid_old_row_names)).select(
+        "", *valid_old_names
+    )
 
     return corr_mat
