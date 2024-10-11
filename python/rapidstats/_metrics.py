@@ -339,4 +339,5 @@ def threshold_for_bad_rate(
     return _threshold_for_bad_rate(
         _y_true_y_score_to_df(y_true=y_true, y_score=y_prob_bad),
         target_bad_rate,
+        n_jobs,
     )
