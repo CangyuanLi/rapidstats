@@ -8,6 +8,7 @@ use pyo3_polars::PyDataFrame;
 mod bootstrap;
 mod distributions;
 mod metrics;
+mod utils;
 
 macro_rules! generate_functions {
     ($func_name:ident, $metric_func:path) => {
@@ -139,6 +140,19 @@ fn _norm_cdf(x: f64) -> PyResult<f64> {
     Ok(distributions::norm_cdf(x))
 }
 
+#[pyfunction]
+fn _threshold_for_bad_rate(
+    df: PyDataFrame,
+    target_bad_rate: f64,
+    n_jobs: Option<usize>,
+) -> PyResult<(f64, f64)> {
+    Ok(metrics::threshold_for_bad_rate(
+        df.into(),
+        target_bad_rate,
+        n_jobs,
+    ))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -164,6 +178,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
+    m.add_function(wrap_pyfunction!(_threshold_for_bad_rate, m)?)?;
 
     Ok(())
 }

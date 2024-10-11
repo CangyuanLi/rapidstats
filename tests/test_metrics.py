@@ -1,4 +1,5 @@
 import numpy as np
+import polars as pl
 import pytest
 import scipy.stats
 import sklearn.metrics
@@ -218,3 +219,53 @@ def test_root_mean_squared_error():
     ref = sklearn.metrics.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
 
     pytest.approx(res) == ref
+
+
+def test_threshold_for_bad_rate():
+    def _bad_rate(y):
+        bad_count = y.sum()
+        total_count = y.count()
+
+        try:
+            bad_rate = bad_count / total_count
+        except ZeroDivisionError:
+            bad_rate = None
+
+        return bad_rate
+
+    def reference_threshold_for_bad_rate(
+        y_true: pl.Series, y_prob_bad: pl.Series, target_bad_rate
+    ):
+        best_distance = float("inf")
+        threshold = 0
+        for score in y_prob_bad.drop_nulls().unique():
+            model_is_bad = y_prob_bad >= score
+            model_approved = y_true.filter(~model_is_bad)
+            bad_rate = _bad_rate(model_approved)
+
+            if bad_rate is None:
+                continue
+
+            distance = abs(target_bad_rate - bad_rate)
+            if distance < best_distance:
+                best_distance = distance
+                threshold = score
+
+        return threshold
+
+    target_bad_rate = 0.035
+
+    ref = reference_threshold_for_bad_rate(
+        pl.Series(Y_TRUE), pl.Series(Y_SCORE), target_bad_rate
+    )
+
+    # Single-threaded
+    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate, n_jobs=1)
+    assert pytest.approx(res[0]) == ref
+
+    # Multi-threaded
+    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate)
+    assert pytest.approx(res[0]) == ref
+
+    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate, n_jobs=2)
+    assert pytest.approx(res[0]) == ref

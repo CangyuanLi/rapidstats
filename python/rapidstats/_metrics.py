@@ -1,4 +1,5 @@
 import dataclasses
+from typing import Optional
 
 import polars as pl
 from polars.series.series import ArrayLike
@@ -12,6 +13,7 @@ from ._rustystats import (
     _mean_squared_error,
     _roc_auc,
     _root_mean_squared_error,
+    _threshold_for_bad_rate,
 )
 from ._utils import _regression_to_df, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
@@ -310,3 +312,31 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Root Mean Squared Error (RMSE)
     """
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
+
+
+def threshold_for_bad_rate(
+    y_true: ArrayLike,
+    y_prob_bad: ArrayLike,
+    target_bad_rate: float,
+    n_jobs: Optional[int] = None,
+) -> tuple[float, float]:
+    """Finds the threshold that is the closest to achieving the target bad rate.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_prob_bad : ArrayLike
+        Predicted scores
+    target_bad_rate : float
+        The target bad rate to achieve
+
+    Returns
+    -------
+    tuple[float, float]
+        A tuple of threshold and bad rate at that threshold
+    """
+    return _threshold_for_bad_rate(
+        _y_true_y_score_to_df(y_true=y_true, y_score=y_prob_bad),
+        target_bad_rate,
+    )

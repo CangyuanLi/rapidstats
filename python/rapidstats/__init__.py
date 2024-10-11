@@ -10,4 +10,5 @@ from ._metrics import (
     mean_squared_error,
     roc_auc,
     root_mean_squared_error,
+    threshold_for_bad_rate,
 )
