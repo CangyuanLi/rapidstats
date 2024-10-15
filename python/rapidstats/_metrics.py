@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Optional
+from typing import Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
@@ -13,7 +13,6 @@ from ._rustystats import (
     _mean_squared_error,
     _roc_auc,
     _root_mean_squared_error,
-    _threshold_for_bad_rate,
 )
 from ._utils import _regression_to_df, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
@@ -317,10 +316,13 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
 def threshold_for_bad_rate(
     y_true: ArrayLike,
     y_prob_bad: ArrayLike,
-    target_bad_rate: float,
-    n_jobs: Optional[int] = None,
-) -> tuple[float, float]:
-    """Finds the threshold that is the closest to achieving the target bad rate.
+    target_bad_rate: Optional[float] = None,
+) -> Union[pl.DataFrame, tuple[float, float]]:
+    """Finds the threshold that is the closest to achieving the target bad rate on the
+    approved population, assuming that True is bad. If the target bad rate is not
+    specified, return a Polars DataFrame of the model approved bad rate at each value
+    of `y_prob_bad`. In the event that multiple thresholds satisfy the target bad rate,
+    (unlikely outside of random data), the lowest threshold is chosen.
 
     Parameters
     ----------
@@ -333,11 +335,39 @@ def threshold_for_bad_rate(
 
     Returns
     -------
-    tuple[float, float]
-        A tuple of threshold and bad rate at that threshold
+    Union[pl.DataFrame, tuple[float, float]]
+        Either a DataFrame or a tuple of threshold and bad rate at that threshold
     """
-    return _threshold_for_bad_rate(
-        _y_true_y_score_to_df(y_true=y_true, y_score=y_prob_bad),
-        target_bad_rate,
-        n_jobs,
+    lf = (
+        pl.LazyFrame({"y_true": y_true, "threshold": y_prob_bad})
+        .with_columns(
+            pl.col("y_true").cast(pl.Boolean), pl.col("threshold").cast(pl.Float64)
+        )
+        .drop_nulls()
+        .sort("threshold", descending=True)
+        .with_columns(
+            pl.col("y_true").cum_sum().alias("cum_bad"),
+            pl.arange(1, pl.len() + 1).alias("cum_total"),
+        )
+        .with_columns(
+            pl.col("cum_bad").tail(1).sub(pl.col("cum_bad")).alias("rem_bad"),
+            pl.len().sub(pl.col("cum_total")).alias("rem_total"),
+        )
+        .with_columns(
+            pl.col("rem_bad").truediv(pl.col("rem_total")).alias("appr_bad_rate")
+        )
     )
+
+    if target_bad_rate is None:
+        return lf.select("threshold", "appr_bad_rate").unique("threshold").collect()
+    else:
+        return (
+            lf.with_columns(
+                pl.col("appr_bad_rate").sub(pl.lit(target_bad_rate)).abs().alias("diff")
+            )
+            .filter(pl.col("diff").eq(pl.col("diff").min()))
+            .select("threshold", "appr_bad_rate")
+            .sort("threshold")
+            .collect()
+            .row(0)
+        )

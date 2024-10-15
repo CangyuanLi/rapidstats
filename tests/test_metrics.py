@@ -238,7 +238,7 @@ def test_threshold_for_bad_rate():
     ):
         best_distance = float("inf")
         threshold = 0
-        for score in y_prob_bad.drop_nulls().unique():
+        for score in y_prob_bad.drop_nulls().unique().sort():
             model_is_bad = y_prob_bad >= score
             model_approved = y_true.filter(~model_is_bad)
             bad_rate = _bad_rate(model_approved)
@@ -260,12 +260,5 @@ def test_threshold_for_bad_rate():
     )
 
     # Single-threaded
-    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate, n_jobs=1)
-    assert pytest.approx(res[0]) == ref
-
-    # Multi-threaded
     res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate)
-    assert pytest.approx(res[0]) == ref
-
-    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate, n_jobs=2)
     assert pytest.approx(res[0]) == ref
