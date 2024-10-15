@@ -1,8 +1,7 @@
 use core::f64;
 
-use crate::{bootstrap, utils};
+use crate::bootstrap;
 use polars::prelude::*;
-use rayon::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 25];
 
