@@ -1,5 +1,6 @@
 import numpy as np
 import polars as pl
+import polars.testing
 import pytest
 import scipy.stats
 import sklearn.metrics
@@ -221,8 +222,8 @@ def test_root_mean_squared_error():
     pytest.approx(res) == ref
 
 
-def test_threshold_for_bad_rate():
-    def _bad_rate(y):
+def test_bad_rate_at_thresholds():
+    def _bad_rate(y: pl.Series):
         bad_count = y.sum()
         total_count = y.count()
 
@@ -233,7 +234,7 @@ def test_threshold_for_bad_rate():
 
         return bad_rate
 
-    def reference_threshold_for_bad_rate(
+    def reference_bad_rate_at_thresholds(
         y_true: pl.Series, y_prob_bad: pl.Series, target_bad_rate
     ):
         best_distance = float("inf")
@@ -255,10 +256,26 @@ def test_threshold_for_bad_rate():
 
     target_bad_rate = 0.035
 
-    ref = reference_threshold_for_bad_rate(
+    ref = reference_bad_rate_at_thresholds(
         pl.Series(Y_TRUE), pl.Series(Y_SCORE), target_bad_rate
     )
 
-    # Single-threaded
-    res = rapidstats.threshold_for_bad_rate(Y_TRUE, Y_SCORE, target_bad_rate)
+    res = rapidstats.bad_rate_at_thresholds(Y_TRUE, Y_SCORE, target_bad_rate)
     assert pytest.approx(res[0]) == ref
+
+
+def test_appr_rate_at_thresholds():
+    def reference_appr_rate_at_thresholds(y_score: pl.Series) -> float:
+        # y_score is y_prob_bad
+        n = len(y_score)
+        unique_vals = y_score.unique().sort()
+        appr_rates = []
+        for score in unique_vals:
+            appr_rates.append(y_score.lt(score).sum() / n)
+
+        return pl.DataFrame({"threshold": unique_vals, "appr_rate": appr_rates})
+
+    ref = reference_appr_rate_at_thresholds(pl.Series(Y_SCORE))
+    res = rapidstats.appr_rate_at_thresholds(Y_SCORE)
+
+    polars.testing.assert_frame_equal(res.sort("threshold"), ref)

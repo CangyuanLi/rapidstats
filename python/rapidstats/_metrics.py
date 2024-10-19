@@ -313,22 +313,23 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
 
 
-def threshold_for_bad_rate(
+def bad_rate_at_thresholds(
     y_true: ArrayLike,
-    y_prob_bad: ArrayLike,
+    y_score: ArrayLike,
     target_bad_rate: Optional[float] = None,
 ) -> Union[pl.DataFrame, tuple[float, float]]:
     """Finds the threshold that is the closest to achieving the target bad rate on the
-    approved population, assuming that True is bad. If the target bad rate is not
-    specified, return a Polars DataFrame of the model approved bad rate at each value
-    of `y_prob_bad`. In the event that multiple thresholds satisfy the target bad rate,
-    (unlikely outside of random data), the lowest threshold is chosen.
+    approved population, assuming that True is bad and that `y_score` is the probability
+    of bad. If the target bad rate is not specified, return a Polars DataFrame of the
+    model approved bad rate at each value of `y_score`. In the event that multiple
+    thresholds satisfy the target bad rate, (unlikely outside of random data),
+    the lowest threshold is chosen.
 
     Parameters
     ----------
     y_true : ArrayLike
         Ground truth target
-    y_prob_bad : ArrayLike
+    y_score : ArrayLike
         Predicted scores
     target_bad_rate : float
         The target bad rate to achieve
@@ -339,10 +340,8 @@ def threshold_for_bad_rate(
         Either a DataFrame or a tuple of threshold and bad rate at that threshold
     """
     lf = (
-        pl.LazyFrame({"y_true": y_true, "threshold": y_prob_bad})
-        .with_columns(
-            pl.col("y_true").cast(pl.Boolean), pl.col("threshold").cast(pl.Float64)
-        )
+        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+        .with_columns(pl.col("y_true").cast(pl.Boolean))
         .drop_nulls()
         .sort("threshold", descending=True)
         .with_columns(
@@ -363,10 +362,61 @@ def threshold_for_bad_rate(
     else:
         return (
             lf.with_columns(
-                pl.col("appr_bad_rate").sub(pl.lit(target_bad_rate)).abs().alias("diff")
+                pl.col("appr_bad_rate").sub(target_bad_rate).abs().alias("diff")
             )
             .filter(pl.col("diff").eq(pl.col("diff").min()))
             .select("threshold", "appr_bad_rate")
+            .sort("threshold")
+            .collect()
+            .row(0)
+        )
+
+
+def appr_rate_at_thresholds(
+    y_score: ArrayLike,
+    target_appr_rate: Optional[float] = None,
+) -> Union[pl.DataFrame, tuple[float, float]]:
+    """Finds the threshold that is the closest to achieving the target approval rate,
+    assuming that `y_score` is the probability of bad.
+    approved population, assuming that True is bad and that `y_score` is the probability
+    of bad. If the target bad rate is not specified, return a Polars DataFrame of the
+    model approved bad rate at each value of `y_score`. In the event that multiple
+    thresholds satisfy the target bad rate, (unlikely outside of random data),
+    the lowest threshold is chosen.
+
+    Parameters
+    ----------
+    y_score : ArrayLike
+        Predicted scores
+    target_appr_rate : Optional[float], optional
+        The target approval rate to achieve, by default None
+
+    Returns
+    -------
+    Union[pl.DataFrame, tuple[float, float]]
+        Either a DataFrame or a tuple of threshold and bad rate at that threshold
+    """
+    lf = (
+        pl.LazyFrame({"threshold": y_score})
+        .drop_nulls()
+        .sort("threshold", descending=False)
+        .with_columns(pl.arange(0, pl.len()).alias("cum_total"))
+        .with_columns(
+            pl.col("cum_total")
+            .truediv(pl.col("cum_total").tail(1).add(1))
+            .alias("appr_rate")
+        )
+    )
+
+    if target_appr_rate is None:
+        return lf.select("threshold", "appr_rate").unique("threshold").collect()
+    else:
+        return (
+            lf.with_columns(
+                pl.col("appr_rate").sub(target_appr_rate).abs().alias("diff")
+            )
+            .filter(pl.col("diff").eq(pl.col("diff").min()))
+            .select("threshold", "appr_rate")
             .sort("threshold")
             .collect()
             .row(0)
