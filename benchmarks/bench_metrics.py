@@ -46,3 +46,13 @@ def bench_mean_squared_error(df):
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_sklearn_mean_squared_error(df):
     sklearn.metrics.mean_squared_error(df["y_score"], df["y_score"])
+
+
+@pybench.parametrize({"n": SIZES}, setup=sample_df)
+def bench_bad_rate_at_thresholds(df):
+    rapidstats.bad_rate_at_thresholds(df["y_true"], df["y_score"])
+
+
+@pybench.parametrize({"n": SIZES}, setup=sample_df)
+def bench_appr_rate_at_thresholds(df):
+    rapidstats.appr_rate_at_thresholds(df["y_score"])
