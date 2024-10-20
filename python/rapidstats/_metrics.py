@@ -323,7 +323,7 @@ def bad_rate_at_thresholds(
     of bad. If the target bad rate is not specified, return a Polars DataFrame of the
     model approved bad rate at each value of `y_score`. In the event that multiple
     thresholds satisfy the target bad rate, (unlikely outside of random data),
-    the lowest threshold is chosen.
+    the highest threshold is chosen (less conservative).
 
     Parameters
     ----------
@@ -366,7 +366,7 @@ def bad_rate_at_thresholds(
             )
             .filter(pl.col("diff").eq(pl.col("diff").min()))
             .select("threshold", "appr_bad_rate")
-            .sort("threshold")
+            .sort("threshold", descending=True)
             .collect()
             .row(0)
         )
@@ -377,12 +377,11 @@ def appr_rate_at_thresholds(
     target_appr_rate: Optional[float] = None,
 ) -> Union[pl.DataFrame, tuple[float, float]]:
     """Finds the threshold that is the closest to achieving the target approval rate,
-    assuming that `y_score` is the probability of bad.
-    approved population, assuming that True is bad and that `y_score` is the probability
-    of bad. If the target bad rate is not specified, return a Polars DataFrame of the
-    model approved bad rate at each value of `y_score`. In the event that multiple
-    thresholds satisfy the target bad rate, (unlikely outside of random data),
-    the lowest threshold is chosen.
+    assuming that `y_score` is the probability of bad. An approval is defined as
+    `y_score` < t. If the target approval rate is not specified, return a Polars
+    DataFrame of the approval rate at each value of `y_score`. In the event that
+    multiple thresholds satisfy the target approval rate, (unlikely outside of random
+    data), the highest threshold is chosen (less conservative).
 
     Parameters
     ----------
@@ -417,7 +416,7 @@ def appr_rate_at_thresholds(
             )
             .filter(pl.col("diff").eq(pl.col("diff").min()))
             .select("threshold", "appr_rate")
-            .sort("threshold")
+            .sort("threshold", descending=True)
             .collect()
             .row(0)
         )
