@@ -234,34 +234,25 @@ def test_bad_rate_at_thresholds():
 
         return bad_rate
 
-    def reference_bad_rate_at_thresholds(
-        y_true: pl.Series, y_prob_bad: pl.Series, target_bad_rate
-    ):
-        best_distance = float("inf")
-        threshold = 0
+    def reference_bad_rate_at_thresholds(y_true: pl.Series, y_prob_bad: pl.Series):
+        res = {"threshold": [], "appr_bad_rate": []}
         for score in y_prob_bad.drop_nulls().unique().sort():
             model_is_bad = y_prob_bad >= score
             model_approved = y_true.filter(~model_is_bad)
             bad_rate = _bad_rate(model_approved)
 
             if bad_rate is None:
-                continue
+                bad_rate = float("nan")
 
-            distance = abs(target_bad_rate - bad_rate)
-            if distance < best_distance:
-                best_distance = distance
-                threshold = score
+            res["threshold"].append(score)
+            res["appr_bad_rate"].append(bad_rate)
 
-        return threshold
+        return pl.DataFrame(res)
 
-    target_bad_rate = 0.035
+    ref = reference_bad_rate_at_thresholds(pl.Series(Y_TRUE), pl.Series(Y_SCORE))
+    res = rapidstats.bad_rate_at_thresholds(Y_TRUE, Y_SCORE)
 
-    ref = reference_bad_rate_at_thresholds(
-        pl.Series(Y_TRUE), pl.Series(Y_SCORE), target_bad_rate
-    )
-
-    res = rapidstats.bad_rate_at_thresholds(Y_TRUE, Y_SCORE, target_bad_rate)
-    assert pytest.approx(res[0]) == ref
+    polars.testing.assert_frame_equal(res.sort("threshold"), ref.sort("threshold"))
 
 
 def test_appr_rate_at_thresholds():
