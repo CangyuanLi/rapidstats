@@ -74,14 +74,14 @@ def reference_confusion_matrix(y_true, y_pred):
     dor = plr / nlr
     balanced_accuracy = sklearn.metrics.balanced_accuracy_score(y_true, y_pred)
     f1 = reference_f1(y_true, y_pred)
-    folkes_mallows_index = sklearn.metrics.fowlkes_mallows_score(y_true, y_pred)
+    folkes_mallows_index = np.sqrt(precision * tpr)
     mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
     acc = sklearn.metrics.accuracy_score(y_true, y_pred)
     threat_score = tp / (tp + fn_ + fp)
 
     return ConfusionMatrix(
         *[
-            float("nan") if np.isinf(x) else x
+            float("nan") if np.isinf(x) else float(x)
             for x in [
                 tn,
                 fp,
@@ -220,6 +220,38 @@ def test_root_mean_squared_error():
     ref = sklearn.metrics.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
 
     pytest.approx(res) == ref
+
+
+def reference_confusion_matrix_at_thresholds(y_true, y_score):
+    cms = []
+    for t in y_score:
+        cms.append(
+            reference_confusion_matrix(y_true, y_score >= t)
+            .to_polars()
+            .with_columns(pl.lit(t).alias("threshold"))
+        )
+
+    return pl.concat(cms, how="vertical_relaxed")
+
+
+def test_confusion_matrix_at_thresholds():
+    y_true = Y_TRUE
+    y_score = Y_SCORE
+
+    res = (
+        rapidstats.confusion_matrix_at_thresholds(y_true, y_score)
+        .unpivot(index="threshold")
+        .rename({"variable": "metric"})
+    )
+    ref = reference_confusion_matrix_at_thresholds(y_true, y_score).fill_nan(None)
+
+    res.join(ref, on=["threshold", "metric"], how="inner", validate="1:1").with_columns(
+        pl.col("value")
+        .sub(pl.col("value_right"))
+        .abs()
+        .gt(1e-6)
+        .alias("is_not_approx_equal")
+    )["is_not_approx_equal"].sum() == 0
 
 
 def test_bad_rate_at_thresholds():

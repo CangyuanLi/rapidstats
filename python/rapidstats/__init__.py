@@ -7,6 +7,7 @@ from ._metrics import (
     bad_rate_at_thresholds,
     brier_loss,
     confusion_matrix,
+    confusion_matrix_at_thresholds,
     max_ks,
     mean,
     mean_squared_error,

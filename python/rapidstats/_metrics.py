@@ -16,6 +16,8 @@ from ._rustystats import (
 )
 from ._utils import _regression_to_df, _y_true_y_pred_to_df, _y_true_y_score_to_df
 
+PolarsFrame = Union[pl.DataFrame, pl.LazyFrame]
+
 
 @dataclasses.dataclass
 class ConfusionMatrix:
@@ -311,6 +313,118 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Root Mean Squared Error (RMSE)
     """
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
+
+
+def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+    return (
+        pf.with_columns(pl.col("y_true").cast(pl.Boolean))
+        .drop_nulls()
+        .sort("threshold", descending=True)
+        .with_columns(
+            pl.col("y_true").cum_sum().alias("tp"),
+            pl.col("y_true").not_().cum_sum().alias("fp"),
+        )
+        .with_columns(
+            pl.col("tp").tail(1).first().alias("total_positives"),
+        )
+        .with_columns(pl.len().sub(pl.col("total_positives")).alias("total_negatives"))
+        .with_columns(
+            pl.col("total_positives").sub(pl.col("tp")).alias("fn"),
+            pl.col("total_negatives").sub(pl.col("fp")).alias("tn"),
+        )
+        .with_columns(
+            pl.col("tp").add(pl.col("fn")).alias("p"),
+            pl.col("fp").add(pl.col("tn")).alias("n"),
+        )
+        .select("threshold", "tn", "fp", "fn", "tp")
+    )
+
+
+def confusion_matrix_at_thresholds(
+    y_true: ArrayLike, y_score: ArrayLike
+) -> pl.DataFrame:
+    return (
+        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+        .pipe(_base_confusion_matrix_at_thresholds)
+        .with_columns(
+            pl.col("tp").add(pl.col("fn")).alias("p"),
+            pl.col("fp").add(pl.col("tn")).alias("n"),
+        )
+        .with_columns(
+            pl.col("tp").truediv("p").alias("tpr"),
+            pl.col("fp").truediv("n").alias("fpr"),
+            pl.col("tp").truediv(pl.col("tp").add(pl.col("fp"))).alias("precision"),
+            pl.col("fn")
+            .truediv(pl.col("fn").add(pl.col("tn")))
+            .alias("false_omission_rate"),
+            pl.col("p").truediv(pl.col("p").add(pl.col("n"))).alias("prevalence"),
+        )
+        .with_columns(
+            pl.lit(1).sub(pl.col("fpr")).alias("tnr"),
+            pl.lit(1).sub(pl.col("precision")).alias("fdr"),
+            pl.col("tpr")
+            .add(pl.lit(1).sub(pl.col("fpr")))
+            .sub(1)
+            .alias("informedness"),
+            pl.col("precision").sub(pl.col("false_omission_rate")).alias("markedness"),
+            pl.lit(2)
+            .mul(pl.col("precision"))
+            .mul(pl.col("tpr"))
+            .truediv(pl.col("precision").add(pl.col("tpr")))
+            .alias("f1"),
+            (pl.col("precision").mul(pl.col("tpr")))
+            .sqrt()
+            .alias("folkes_mallows_index"),
+            pl.col("tp")
+            .add(pl.col("tn"))
+            .truediv(pl.col("p").add(pl.col("n")))
+            .alias("acc"),
+            pl.col("tp")
+            .truediv(pl.col("tp").add(pl.col("fn")).add(pl.col("fp")))
+            .alias("threat_score"),
+        )
+        .with_columns(
+            pl.lit(1).sub(pl.col("tpr")).alias("fnr"),
+            pl.lit(1).sub(pl.col("false_omission_rate")).alias("npv"),
+            pl.col("tpr").truediv(pl.col("fpr")).alias("plr"),
+        )
+        .with_columns(pl.col("fnr").truediv(pl.lit(1).sub(pl.col("fpr"))).alias("nlr"))
+        .with_columns(
+            pl.col("tpr")
+            .mul(pl.col("fpr"))
+            .sqrt()
+            .sub(pl.col("fpr"))
+            .truediv(pl.col("tpr").sub(pl.col("fpr")))
+            .alias("prevalence_threshold"),
+            pl.col("tpr")
+            .mul(pl.lit(1).sub(pl.col("fpr")))
+            .mul(pl.col("precision"))
+            .mul(pl.col("npv"))
+            .sqrt()
+            .sub(
+                pl.col("fnr")
+                .mul(pl.col("fpr"))
+                .mul(pl.col("false_omission_rate"))
+                .mul(pl.col("fdr"))
+                .sqrt()
+            )
+            .alias("mcc"),
+            pl.col("tpr")
+            .add(pl.lit(1).sub(pl.col("fpr")))
+            .truediv(2)
+            .alias("balanced_accuracy"),
+            pl.col("plr").truediv(pl.col("nlr")).alias("dor"),
+        )
+        .drop("p", "n")
+        .with_columns(
+            pl.when(pl.selectors.float().is_infinite())
+            .then(None)
+            .otherwise(pl.selectors.float())
+            .name.keep()
+        )
+        .fill_nan(None)
+        .collect()
+    )
 
 
 def bad_rate_at_thresholds(
