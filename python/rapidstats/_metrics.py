@@ -343,6 +343,28 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
 def confusion_matrix_at_thresholds(
     y_true: ArrayLike, y_score: ArrayLike
 ) -> pl.DataFrame:
+    """Compute the confusion matrix at each model score. Equivalent to
+
+    ``` py
+    for t in y_score:
+        y_pred = y_score >= t
+        confusion_matrix(y_true, y_pred)
+    ```
+
+    but does so using fast DataFrame operations.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    pl.DataFrame
+        A Polars DataFrame of `threshold` and the confusion matrix metrics.
+    """
     return (
         pl.LazyFrame({"y_true": y_true, "threshold": y_score})
         .pipe(_base_confusion_matrix_at_thresholds)
