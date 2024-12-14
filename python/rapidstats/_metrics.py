@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Optional, Union
+from typing import Union
 
 import polars as pl
 from polars.series.series import ArrayLike
