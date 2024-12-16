@@ -317,9 +317,7 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
 
 def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
     return (
-        pf.with_columns(pl.col("y_true").cast(pl.Boolean))
-        .drop_nulls()
-        .sort("threshold", descending=True)
+        pf.sort("threshold", descending=True)
         .with_columns(
             pl.col("y_true").cum_sum().alias("tp"),
             pl.col("y_true").not_().cum_sum().alias("fp"),
@@ -367,6 +365,8 @@ def confusion_matrix_at_thresholds(
     """
     return (
         pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+        .with_columns(pl.col("y_true").cast(pl.Boolean))
+        .drop_nulls()
         .pipe(_base_confusion_matrix_at_thresholds)
         .with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
