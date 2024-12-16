@@ -8,6 +8,7 @@ from polars.interchange.protocol import SupportsInterchange
 from polars.series.series import ArrayLike
 
 DataFrame = Union[pl.DataFrame, SupportsInterchange]
+PolarsFrame = Union[pl.LazyFrame, pl.DataFrame]
 
 
 def _to_polars(df: DataFrame) -> pl.DataFrame:
@@ -44,6 +45,17 @@ def _y_true_y_pred_to_df(y_true: ArrayLike, y_pred: ArrayLike) -> pl.DataFrame:
         pl.DataFrame({"y_true": y_true, "y_pred": y_pred})
         .with_columns(pl.col("y_true", "y_pred").cast(pl.Boolean))
         .drop_nulls()
+    )
+
+
+def _fill_infinite(
+    pf: PolarsFrame, value: Union[pl.Expr, int, float, None]
+) -> PolarsFrame:
+    return pf.with_columns(
+        pl.when(pl.selectors.float().is_infinite())
+        .then(value)
+        .otherwise(pl.selectors.float())
+        .name.keep()
     )
 
 

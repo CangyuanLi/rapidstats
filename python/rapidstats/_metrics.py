@@ -14,7 +14,12 @@ from ._rustystats import (
     _roc_auc,
     _root_mean_squared_error,
 )
-from ._utils import _regression_to_df, _y_true_y_pred_to_df, _y_true_y_score_to_df
+from ._utils import (
+    _fill_infinite,
+    _regression_to_df,
+    _y_true_y_pred_to_df,
+    _y_true_y_score_to_df,
+)
 
 PolarsFrame = Union[pl.DataFrame, pl.LazyFrame]
 
@@ -438,12 +443,7 @@ def confusion_matrix_at_thresholds(
             pl.col("plr").truediv(pl.col("nlr")).alias("dor"),
         )
         .drop("p", "n")
-        .with_columns(
-            pl.when(pl.selectors.float().is_infinite())
-            .then(None)
-            .otherwise(pl.selectors.float())
-            .name.keep()
-        )
+        .pipe(_fill_infinite, None)
         .fill_nan(None)
         .collect()
     )
