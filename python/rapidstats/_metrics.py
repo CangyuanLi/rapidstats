@@ -343,37 +343,9 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
     )
 
 
-def confusion_matrix_at_thresholds(
-    y_true: ArrayLike, y_score: ArrayLike
-) -> pl.DataFrame:
-    """Compute the confusion matrix at each model score. Equivalent to
-
-    ``` py
-    for t in y_score:
-        y_pred = y_score >= t
-        confusion_matrix(y_true, y_pred)
-    ```
-
-    but does so using fast DataFrame operations.
-
-    Parameters
-    ----------
-    y_true : ArrayLike
-        Ground truth target
-    y_score : ArrayLike
-        Predicted scores
-
-    Returns
-    -------
-    pl.DataFrame
-        A Polars DataFrame of `threshold` and the confusion matrix metrics.
-    """
+def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
     return (
-        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
-        .with_columns(pl.col("y_true").cast(pl.Boolean))
-        .drop_nulls()
-        .pipe(_base_confusion_matrix_at_thresholds)
-        .with_columns(
+        pf.with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
             pl.col("fp").add(pl.col("tn")).alias("n"),
         )
@@ -445,5 +417,40 @@ def confusion_matrix_at_thresholds(
         .drop("p", "n")
         .pipe(_fill_infinite, None)
         .fill_nan(None)
+    )
+
+
+def confusion_matrix_at_thresholds(
+    y_true: ArrayLike, y_score: ArrayLike
+) -> pl.DataFrame:
+    """Compute the confusion matrix at each model score. Equivalent to
+
+    ``` py
+    for t in y_score:
+        y_pred = y_score >= t
+        confusion_matrix(y_true, y_pred)
+    ```
+
+    but does so using fast DataFrame operations.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    pl.DataFrame
+        A Polars DataFrame of `threshold` and the confusion matrix metrics.
+    """
+    return (
+        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+        .with_columns(pl.col("y_true").cast(pl.Boolean))
+        .drop_nulls()
+        .pipe(_base_confusion_matrix_at_thresholds)
+        .pipe(_full_confusion_matrix_from_base)
+        .unique("threshold")
         .collect()
     )
