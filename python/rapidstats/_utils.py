@@ -3,9 +3,9 @@ import multiprocessing
 from typing import Literal, Union
 
 import polars as pl
-import tqdm
 from polars.interchange.protocol import SupportsInterchange
 from polars.series.series import ArrayLike
+from tqdm.auto import tqdm
 
 DataFrame = Union[pl.DataFrame, SupportsInterchange]
 PolarsFrame = Union[pl.LazyFrame, pl.DataFrame]
@@ -72,7 +72,7 @@ def _run_concurrent(
     **executor_kwargs,
 ):
     if executor_kwargs.get("max_workers") == 1:
-        return [fn(i) for i in tqdm.tqdm(iterable, disable=quiet)]
+        return [fn(i) for i in tqdm(iterable, disable=quiet)]
 
     if executor == "threads":
         executor = concurrent.futures.ThreadPoolExecutor(**executor_kwargs)
