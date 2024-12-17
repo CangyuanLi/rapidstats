@@ -3,11 +3,15 @@ from __future__ import annotations
 import dataclasses
 import functools
 import math
-from typing import Callable, Literal, Optional, Union
+from typing import Callable, Literal, Optional
 
 import polars as pl
 from polars.series.series import ArrayLike
 
+from ._metrics import (
+    _base_confusion_matrix_at_thresholds,
+    _full_confusion_matrix_from_base,
+)
 from ._rustystats import (
     _basic_interval,
     _bca_interval,
@@ -375,6 +379,42 @@ class Bootstrap:
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(df, **self._params)
         )
+
+    def confusion_matrix_at_thresholds(
+        self, y_true: ArrayLike, y_score: ArrayLike
+    ) -> ConfidenceInterval:
+        if self.method != "percentile":
+            raise ValueError(
+                "Currently, only `percentile` is supported for `confusion_matrix_at_thresholds`"
+            )
+
+        df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
+
+        def _cm(i: int) -> pl.LazyFrame:
+            sample_df = df.sample(fraction=1, with_replacement=True, seed=self.seed)
+
+            return (
+                sample_df.lazy()
+                .pipe(_base_confusion_matrix_at_thresholds)
+                .pipe(_full_confusion_matrix_from_base)
+                .unique("threshold")
+            )
+
+        cms = _run_concurrent(_cm, range(self.iterations))
+
+        lf: pl.LazyFrame = pl.concat(cms, how="vertical")
+        lf = (
+            lf.unpivot(index="threshold")
+            .rename({"variable": "metric"})
+            .group_by("threshold", "metric")
+        )
+
+        if self.method == "percentile":
+            return lf.agg(
+                pl.col("value").quantile(self.alpha).alias("lower"),
+                pl.col("value").mean().alias("mean"),
+                pl.col("value").quantile(1 - self.alpha).alias("upper"),
+            ).collect()
 
     def roc_auc(
         self,
