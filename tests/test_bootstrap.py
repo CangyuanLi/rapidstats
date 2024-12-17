@@ -144,6 +144,7 @@ def test_bootstrap_succesfully_runs():
     bs.brier_loss(y_true, y_score)
     bs.mean(y_score)
     bs.confusion_matrix(y_true, y_pred)
+    bs.confusion_matrix_at_thresholds(y_true, y_score)
     bs.adverse_impact_ratio(y_pred, y_true, y_score <= 0.5)
     bs.max_ks(y_true, y_score)
     bs.mean_squared_error(y_true_score, y_score)
