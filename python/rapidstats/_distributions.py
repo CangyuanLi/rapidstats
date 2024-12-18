@@ -27,7 +27,7 @@ class norm:
 
     @staticmethod
     def cdf(x: float) -> float:
-        """The cumulative distribution function.
+        r"""The cumulative distribution function.
 
         Parameters
         ----------
