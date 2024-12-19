@@ -8,8 +8,14 @@ from typing import Callable, Literal, Optional
 import polars as pl
 from polars.series.series import ArrayLike
 
+from ._distributions import norm
 from ._metrics import (
+    ConfusionMatrixMetric,
+    DefaultConfusionMatrixMetrics,
+    LoopStrategy,
+    PolarsFrame,
     _base_confusion_matrix_at_thresholds,
+    _filter_to_thresholds,
     _full_confusion_matrix_from_base,
 )
 from ._rustystats import (
@@ -373,7 +379,7 @@ class Bootstrap:
         Returns
         -------
         BootstrappedConfusionMatrix
-            A dataclass of 25 confusion matrix metrics as (lower, mean, upper). See
+            A dataclass of confusion matrix metrics as (lower, mean, upper). See
             [rapidstats._bootstrap.BootstrappedConfusionMatrix][] for more details.
         """
         df = _y_true_y_pred_to_df(y_true, y_pred)
@@ -383,40 +389,111 @@ class Bootstrap:
         )
 
     def confusion_matrix_at_thresholds(
-        self, y_true: ArrayLike, y_score: ArrayLike
+        self,
+        y_true: ArrayLike,
+        y_score: ArrayLike,
+        thresholds: Optional[list[float]] = None,
+        metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
+        strategy: LoopStrategy = "auto",
     ) -> ConfidenceInterval:
-        if self.method != "percentile":
-            raise ValueError(
-                "Currently, only `percentile` is supported for `confusion_matrix_at_thresholds`"
-            )
-
         df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
+        final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
-        def _cm(i: int) -> pl.LazyFrame:
-            sample_df = df.sample(fraction=1, with_replacement=True, seed=self.seed)
+        if strategy == "loop":
+            cms = []
+            for t in set(thresholds or y_score):
+                cm = (
+                    self.confusion_matrix(df["y_true"], df["y_score"].ge(t))
+                    .to_polars()
+                    .with_columns(pl.lit(t).alias("threshold"))
+                )
+                cms.append(cm)
 
+            return pl.concat(cms, how="vertical").select(final_cols)
+
+        def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
             return (
-                sample_df.lazy()
+                pf.lazy()
                 .pipe(_base_confusion_matrix_at_thresholds)
                 .pipe(_full_confusion_matrix_from_base)
                 .unique("threshold")
             )
 
-        cms = _run_concurrent(_cm, range(self.iterations))
+        def _cm(i: int) -> pl.LazyFrame:
+            sample_df = df.sample(fraction=1, with_replacement=True, seed=self.seed)
 
-        lf: pl.LazyFrame = pl.concat(cms, how="vertical")
+            return _cm_inner(sample_df)
+
+        cms: list[pl.LazyFrame] = _run_concurrent(_cm, range(self.iterations))
+
         lf = (
-            lf.unpivot(index="threshold")
+            pl.concat(cms, how="vertical")
+            .select("threshold", *metrics)
+            .pipe(_filter_to_thresholds, thresholds)
+            .unpivot(index="threshold")
             .rename({"variable": "metric"})
             .group_by("threshold", "metric")
         )
 
-        if self.method == "percentile":
-            return lf.agg(
-                pl.col("value").quantile(self.alpha).alias("lower"),
-                pl.col("value").mean().alias("mean"),
-                pl.col("value").quantile(1 - self.alpha).alias("upper"),
-            ).collect()
+        if self.method == "standard":
+            z = norm.ppf(1 - self.alpha)
+
+            return (
+                lf.agg(
+                    pl.col("value").mean().alias("mean"),
+                    pl.col("value").std().alias("std"),
+                )
+                .with_columns(pl.col("std").mul(z).alias("x"))
+                .with_columns(
+                    pl.col("mean").sub(pl.col("x")).alias("lower"),
+                    pl.col("mean").add(pl.col("x")).alias("upper"),
+                )
+                .select(final_cols)
+                .collect()
+            )
+        elif self.method == "percentile":
+            return (
+                lf.agg(
+                    pl.col("value").quantile(self.alpha).alias("lower"),
+                    pl.col("value").mean().alias("mean"),
+                    pl.col("value").quantile(1 - self.alpha).alias("upper"),
+                )
+                .select(final_cols)
+                .collect()
+            )
+        elif self.method == "basic":
+            original = (
+                _cm_inner(df)
+                .select("threshold", *metrics)
+                .pipe(_filter_to_thresholds, thresholds)
+                .unpivot(index="threshold")
+                .rename({"variable": "metric", "value": "original"})
+            )
+
+            return (
+                lf.agg(
+                    pl.col("value").quantile(self.alpha).alias("lower"),
+                    pl.col("value").mean().alias("mean"),
+                    pl.col("value").quantile(1 - self.alpha).alias("upper"),
+                )
+                .join(
+                    original,
+                    on=["threshold", "metric"],
+                    how="left",
+                    validate="1:1",
+                )
+                .with_columns(pl.col("original").mul(2).alias("x"))
+                .with_columns(
+                    pl.col("x").sub(pl.col("upper")).alias("lower"),
+                    pl.col("x").sub(pl.col("lower")).alias("upper"),
+                )
+                .select(final_cols)
+                .collect()
+            )
+        elif self.method == "BCa":
+            raise NotImplementedError(
+                "BCa is not yet implemented for strategy `cum_sum`."
+            )
 
     def roc_auc(
         self,

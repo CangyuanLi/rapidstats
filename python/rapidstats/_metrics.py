@@ -4,7 +4,6 @@ from typing import Literal, Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
-from tqdm.auto import tqdm
 
 from ._rustystats import (
     _adverse_impact_ratio,
@@ -56,6 +55,7 @@ ConfusionMatrixMetric = Literal[
 ]
 
 DefaultConfusionMatrixMetrics = typing.get_args(ConfusionMatrixMetric)
+LoopStrategy = Literal["auto", "loop", "cum_sum"]
 
 
 @dataclasses.dataclass
@@ -460,12 +460,29 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
     )
 
 
+def _filter_to_thresholds(
+    pf: PolarsFrame, thresholds: Optional[list[float]]
+) -> pl.LazyFrame:
+    if thresholds is None:
+        return pf.lazy()
+
+    return (
+        pf.lazy()
+        .join(pl.LazyFrame({"target_threshold": thresholds}), how="cross")
+        .filter(pl.col("threshold").le(pl.col("target_threshold")))
+        .group_by("target_threshold")
+        .agg(pl.col("threshold").max())
+        .drop("threshold")
+        .rename({"target_threshold": "threshold"})
+    )
+
+
 def confusion_matrix_at_thresholds(
     y_true: ArrayLike,
     y_score: ArrayLike,
     thresholds: Optional[list[float]] = None,
     metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
-    strategy: Literal["auto", "loop", "cum_sum"] = "auto",
+    strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
     """Compute the confusion matrix at each threshold. When the `strategy` is "cum_sum",
     computes
@@ -510,7 +527,7 @@ def confusion_matrix_at_thresholds(
 
         return pl.concat(cms, how="vertical")
     elif strategy == "cum_sum":
-        lf = (
+        return (
             pl.LazyFrame({"y_true": y_true, "threshold": y_score})
             .with_columns(pl.col("y_true").cast(pl.Boolean))
             .drop_nulls()
@@ -518,19 +535,11 @@ def confusion_matrix_at_thresholds(
             .pipe(_full_confusion_matrix_from_base)
             .select("threshold", *metrics)
             .unique("threshold")
+            .pipe(_filter_to_thresholds, thresholds)
+            .unpivot(index="threshold")
+            .rename({"variable": "metric"})
+            .collect()
         )
-
-        if thresholds is not None:
-            lf = (
-                lf.join(pl.LazyFrame({"target_threshold": thresholds}), how="cross")
-                .filter(pl.col("threshold").le(pl.col("target_threshold")))
-                .group_by("target_threshold")
-                .agg(pl.col("threshold").max())
-                .drop("threshold")
-                .rename({"target_threshold": "threshold"})
-            )
-
-        return lf.unpivot(index="threshold").rename({"variable": "metric"}).collect()
     else:
         raise ValueError(
             f"Invalid strategy {strategy}, please specify one of `auto`, `loop`, or `cum_sum`."
