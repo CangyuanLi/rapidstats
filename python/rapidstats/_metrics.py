@@ -4,6 +4,7 @@ from typing import Literal, Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
+from tqdm.auto import tqdm
 
 from ._rustystats import (
     _adverse_impact_ratio,
@@ -18,6 +19,7 @@ from ._rustystats import (
 from ._utils import (
     _fill_infinite,
     _regression_to_df,
+    _run_concurrent,
     _y_true_y_pred_to_df,
     _y_true_y_score_to_df,
 )
@@ -488,21 +490,23 @@ def confusion_matrix_at_thresholds(
     pl.DataFrame
         A Polars DataFrame of `threshold`, `metric`, and `value`.
     """
-    y_score = pl.Series(y_score)
-
     if strategy == "auto":
-        pass
+        if len(thresholds) < 10:
+            strategy = "loop"
+        else:
+            strategy = "cum_sum"
 
     if strategy == "loop":
         df = _y_true_y_score_to_df(y_true, y_score)
-        cms: list[pl.DataFrame] = []
-        for t in set(thresholds or y_score):
-            cm = (
+
+        def _cm(t):
+            return (
                 confusion_matrix(df["y_true"], df["y_score"].ge(t))
                 .to_polars()
                 .with_columns(pl.lit(t).alias("threshold"))
             )
-            cms.append(cm)
+
+        cms = _run_concurrent(_cm, set(thresholds or y_score))
 
         return pl.concat(cms, how="vertical")
     elif strategy == "cum_sum":
