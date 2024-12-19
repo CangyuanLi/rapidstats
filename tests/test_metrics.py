@@ -1,6 +1,5 @@
 import numpy as np
 import polars as pl
-import polars.testing
 import pytest
 import scipy.stats
 import sklearn.metrics
@@ -75,9 +74,13 @@ def reference_confusion_matrix(y_true, y_pred):
     balanced_accuracy = sklearn.metrics.balanced_accuracy_score(y_true, y_pred)
     f1 = reference_f1(y_true, y_pred)
     folkes_mallows_index = np.sqrt(precision * tpr)
-    mcc = sklearn.metrics.matthews_corrcoef(y_true, y_pred)
+    mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
+        fnr * fpr * false_omission_rate * fdr
+    )
     acc = sklearn.metrics.accuracy_score(y_true, y_pred)
     threat_score = tp / (tp + fn_ + fp)
+    ppr = (tp + fp) / (p + n)
+    pnr = (tn + fn_) / (p + n)
 
     return ConfusionMatrix(
         *[
@@ -108,6 +111,8 @@ def reference_confusion_matrix(y_true, y_pred):
                 fdr,
                 npv,
                 dor,
+                ppr,
+                pnr,
             ]
         ]
     )
@@ -235,20 +240,40 @@ def reference_confusion_matrix_at_thresholds(y_true, y_score):
 
 
 def test_confusion_matrix_at_thresholds():
+    def assert_approx_equal(res, ref):
+        assert (
+            res.join(ref, on=["threshold", "metric"], how="inner", validate="1:1")
+            .with_columns(
+                pl.col("value")
+                .sub(pl.col("value_right"))
+                .abs()
+                .gt(1e-6)
+                .alias("is_not_approx_equal")
+            )["is_not_approx_equal"]
+            .sum()
+            == 0
+        )
+
     y_true = Y_TRUE
     y_score = Y_SCORE
 
-    res = (
-        rapidstats.confusion_matrix_at_thresholds(y_true, y_score)
-        .unpivot(index="threshold")
-        .rename({"variable": "metric"})
-    )
     ref = reference_confusion_matrix_at_thresholds(y_true, y_score).fill_nan(None)
 
-    res.join(ref, on=["threshold", "metric"], how="inner", validate="1:1").with_columns(
-        pl.col("value")
-        .sub(pl.col("value_right"))
-        .abs()
-        .gt(1e-6)
-        .alias("is_not_approx_equal")
-    )["is_not_approx_equal"].sum() == 0
+    # loop
+    res = rapidstats.confusion_matrix_at_thresholds(y_true, y_score, strategy="loop")
+    print(
+        res.join(ref, on=["threshold", "metric"], how="inner", validate="1:1")
+        .with_columns(
+            pl.col("value")
+            .sub(pl.col("value_right"))
+            .abs()
+            .gt(1e-6)
+            .alias("is_not_approx_equal")
+        )
+        .filter(pl.col("is_not_approx_equal"))
+    )
+    assert_approx_equal(res, ref)
+
+    # cum_sum
+    res = rapidstats.confusion_matrix_at_thresholds(y_true, y_score, strategy="cum_sum")
+    assert_approx_equal(res, ref)
