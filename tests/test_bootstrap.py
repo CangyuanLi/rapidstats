@@ -133,8 +133,14 @@ def test_bca_interval():
         assert pytest.approx(a, rel=1e-5) == b
 
 
-def test_bootstrap_succesfully_runs():
-    bs = rapidstats.Bootstrap(iterations=10)
+@pytest.mark.parametrize(
+    "bs",
+    [
+        rapidstats.Bootstrap(method=method, iterations=5)
+        for method in ["standard", "percentile", "basic", "BCa"]
+    ],
+)
+def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
     y_true_score = np.random.rand(100)
     y_true = y_true_score >= 0.5
     y_score = np.random.rand(100)
@@ -144,7 +150,10 @@ def test_bootstrap_succesfully_runs():
     bs.brier_loss(y_true, y_score)
     bs.mean(y_score)
     bs.confusion_matrix(y_true, y_pred)
-    bs.confusion_matrix_at_thresholds(y_true, y_score)
+
+    if bs.method != "BCa":
+        bs.confusion_matrix_at_thresholds(y_true, y_score)
+
     bs.adverse_impact_ratio(y_pred, y_true, y_score <= 0.5)
     bs.max_ks(y_true, y_score)
     bs.mean_squared_error(y_true_score, y_score)
