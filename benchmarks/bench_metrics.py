@@ -48,11 +48,30 @@ def bench_sklearn_mean_squared_error(df):
     sklearn.metrics.mean_squared_error(df["y_score"], df["y_score"])
 
 
-@pybench.parametrize({"n": SIZES}, setup=sample_df)
-def bench_bad_rate_at_thresholds(df):
-    rapidstats.bad_rate_at_thresholds(df["y_true"], df["y_score"])
+def sample_df_thresh(n, n_thresholds):
+    thresholds = (
+        None if n_thresholds == n else [t / 100 for t in range(1, n_thresholds + 1)]
+    )
+
+    return {"df": DF.sample(n, seed=SEED), "thresholds": thresholds}
 
 
-@pybench.parametrize({"n": SIZES}, setup=sample_df)
-def bench_appr_rate_at_thresholds(df):
-    rapidstats.appr_rate_at_thresholds(df["y_score"])
+@pybench.parametrize(
+    {"n": [1_000, 10_000, 50_000], "n_thresholds": [5, 10, 100]},
+    setup=sample_df_thresh,
+)
+def bench_confusion_matrix_at_thresholds_loop(df, thresholds):
+
+    rapidstats.confusion_matrix_at_thresholds(
+        df["y_true"], df["y_score"], thresholds=thresholds, strategy="loop"
+    )
+
+
+@pybench.parametrize(
+    {"n": [1_000, 10_000, 50_000], "n_thresholds": [5, 10, 100]},
+    setup=sample_df_thresh,
+)
+def bench_confusion_matrix_at_thresholds_cum_sum(df, thresholds):
+    rapidstats.confusion_matrix_at_thresholds(
+        df["y_true"], df["y_score"], thresholds=thresholds, strategy="cum_sum"
+    )
