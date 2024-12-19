@@ -120,7 +120,12 @@ pub fn bootstrap_confusion_matrix(
     );
     let bs_transposed = transpose_confusion_matrix_results(bootstrap_stats);
 
-    if method == "percentile" {
+    if method == "standard" {
+        bs_transposed
+            .into_iter()
+            .map(|bs| bootstrap::standard_interval(bs, alpha))
+            .collect::<Vec<bootstrap::ConfidenceInterval>>()
+    } else if method == "percentile" {
         bs_transposed
             .into_iter()
             .map(|bs| bootstrap::percentile_interval(bs, alpha))
