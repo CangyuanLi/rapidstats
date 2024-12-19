@@ -71,6 +71,8 @@ class BootstrappedConfusionMatrix:
     fdr: ConfidenceInterval
     npv: ConfidenceInterval
     dor: ConfidenceInterval
+    ppr: ConfidenceInterval
+    pnr: ConfidenceInterval
 
     def to_polars(self) -> pl.DataFrame:
         """Transform the dataclass to a long Polars DataFrame with columns

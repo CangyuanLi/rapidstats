@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Union
+import typing
+from typing import Literal, Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
@@ -22,6 +23,37 @@ from ._utils import (
 )
 
 PolarsFrame = Union[pl.DataFrame, pl.LazyFrame]
+ConfusionMatrixMetric = Literal[
+    "tn",
+    "fp",
+    "fn",
+    "tp",
+    "tpr",
+    "fpr",
+    "fnr",
+    "tnr",
+    "prevalence",
+    "prevalence_threshold",
+    "informedness",
+    "precision",
+    "false_omission_rate",
+    "plr",
+    "nlr",
+    "acc",
+    "balanced_accuracy",
+    "f1",
+    "folkes_mallows_index",
+    "mcc",
+    "threat_score",
+    "markedness",
+    "fdr",
+    "npv",
+    "dor",
+    "ppr",
+    "pnr",
+]
+
+DefaultConfusionMatrixMetrics = typing.get_args(ConfusionMatrixMetric)
 
 
 @dataclasses.dataclass
@@ -86,6 +118,10 @@ class ConfusionMatrix:
         Negative Predictive Value; Proportion of predicted negatives that are correct; \( \frac{TN}{FN + TN} \)
     dor : float
         Diagnostic Odds Ratio; \( \frac{LR+}{LR-} \)
+    ppr : float
+        Predicted Positive Ratio; Proportion that are predicted positive; \( \frac{TP + FP}{TN + FP + FN + TP})
+    pnr : float
+        Predicted Negative Ratio; Proportion that are predicted negative; \( \frac{TN + FN}{TN + FP + FN + TP})
     """
 
     tn: float
@@ -113,6 +149,8 @@ class ConfusionMatrix:
     fdr: float
     npv: float
     dor: float
+    ppr: float
+    pnr: float
 
     def to_polars(self) -> pl.DataFrame:
         """Convert the dataclass to a long Polars DataFrame with columns `metric` and
@@ -129,9 +167,7 @@ class ConfusionMatrix:
 
 
 def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
-    """Computes the 25 confusion matrix metrics (TP, FP, TN, FN, TPR, F1, etc.). Please
-    see https://en.wikipedia.org/wiki/Confusion_matrix for a list of all confusion
-    matrix metrics and their formulas.
+    """Computes confusion matrix metrics (TP, FP, TN, FN, TPR, F1, etc.).
 
     Parameters
     ----------
@@ -143,7 +179,7 @@ def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
     Returns
     -------
     ConfusionMatrix
-        Dataclass of 25 confusion matrix metrics
+        Dataclass of confusion matrix metrics
     """
     df = _y_true_y_pred_to_df(y_true, y_pred)
 
@@ -348,6 +384,8 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
         pf.with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
             pl.col("fp").add(pl.col("tn")).alias("n"),
+            pl.col("tp").add(pl.col("fp")).alias("pp"),
+            pl.col("tn").add(pl.col("fn")).alias("pn"),
         )
         .with_columns(
             pl.col("tp").truediv("p").alias("tpr"),
@@ -357,6 +395,7 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
             .truediv(pl.col("fn").add(pl.col("tn")))
             .alias("false_omission_rate"),
             pl.col("p").truediv(pl.col("p").add(pl.col("n"))).alias("prevalence"),
+            pl.col("p").add(pl.col("n")).alias("total"),
         )
         .with_columns(
             pl.lit(1).sub(pl.col("fpr")).alias("tnr"),
@@ -374,13 +413,12 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
             (pl.col("precision").mul(pl.col("tpr")))
             .sqrt()
             .alias("folkes_mallows_index"),
-            pl.col("tp")
-            .add(pl.col("tn"))
-            .truediv(pl.col("p").add(pl.col("n")))
-            .alias("acc"),
+            pl.col("tp").add(pl.col("tn")).truediv(pl.col("total")).alias("acc"),
             pl.col("tp")
             .truediv(pl.col("tp").add(pl.col("fn")).add(pl.col("fp")))
             .alias("threat_score"),
+            pl.col("pp").truediv(pl.col("total")).alias("ppr"),
+            pl.col("pn").truediv(pl.col("total")).alias("pnr"),
         )
         .with_columns(
             pl.lit(1).sub(pl.col("tpr")).alias("fnr"),
@@ -414,16 +452,21 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
             .alias("balanced_accuracy"),
             pl.col("plr").truediv(pl.col("nlr")).alias("dor"),
         )
-        .drop("p", "n")
+        .drop("p", "n", "pp", "pn", "total")
         .pipe(_fill_infinite, None)
         .fill_nan(None)
     )
 
 
 def confusion_matrix_at_thresholds(
-    y_true: ArrayLike, y_score: ArrayLike
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    thresholds: Optional[list[float]] = None,
+    metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
+    strategy: Literal["auto", "loop", "cum_sum"] = "auto",
 ) -> pl.DataFrame:
-    """Compute the confusion matrix at each model score. Equivalent to
+    """Compute the confusion matrix at each threshold. When the `strategy` is "cum_sum",
+    computes
 
     ``` py
     for t in y_score:
@@ -431,7 +474,7 @@ def confusion_matrix_at_thresholds(
         confusion_matrix(y_true, y_pred)
     ```
 
-    but does so using fast DataFrame operations.
+    using fast DataFrame operations.
 
     Parameters
     ----------
@@ -443,14 +486,48 @@ def confusion_matrix_at_thresholds(
     Returns
     -------
     pl.DataFrame
-        A Polars DataFrame of `threshold` and the confusion matrix metrics.
+        A Polars DataFrame of `threshold`, `metric`, and `value`.
     """
-    return (
-        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
-        .with_columns(pl.col("y_true").cast(pl.Boolean))
-        .drop_nulls()
-        .pipe(_base_confusion_matrix_at_thresholds)
-        .pipe(_full_confusion_matrix_from_base)
-        .unique("threshold")
-        .collect()
-    )
+    y_score = pl.Series(y_score)
+
+    if strategy == "auto":
+        pass
+
+    if strategy == "loop":
+        df = _y_true_y_score_to_df(y_true, y_score)
+        cms: list[pl.DataFrame] = []
+        for t in set(thresholds or y_score):
+            cm = (
+                confusion_matrix(df["y_true"], df["y_score"].ge(t))
+                .to_polars()
+                .with_columns(pl.lit(t).alias("threshold"))
+            )
+            cms.append(cm)
+
+        return pl.concat(cms, how="vertical")
+    elif strategy == "cum_sum":
+        lf = (
+            pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+            .with_columns(pl.col("y_true").cast(pl.Boolean))
+            .drop_nulls()
+            .pipe(_base_confusion_matrix_at_thresholds)
+            .pipe(_full_confusion_matrix_from_base)
+            .select("threshold", *metrics)
+            .unique("threshold")
+        )
+
+        if thresholds is not None:
+            lf = (
+                lf.join(pl.LazyFrame({"target_threshold": thresholds}), how="cross")
+                .filter(pl.col("threshold").le(pl.col("target_threshold")))
+                .group_by("target_threshold")
+                .agg(pl.col("threshold").max())
+                .drop("threshold")
+                .rename({"target_threshold": "threshold"})
+            )
+
+        return lf.unpivot(index="threshold").rename({"variable": "metric"}).collect()
+    else:
+        raise ValueError(
+            f"Invalid strategy {strategy}, please specify one of `auto`, `loop`, or `cum_sum`."
+        )

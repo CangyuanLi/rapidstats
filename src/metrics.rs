@@ -3,9 +3,7 @@ use core::f64;
 use crate::bootstrap;
 use polars::prelude::*;
 
-pub type ConfusionMatrixArray = [f64; 25];
-
-const BINARY_CM_VALUES: [i32; 4] = [0, 1, 2, 3];
+pub type ConfusionMatrixArray = [f64; 27];
 
 pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
     df.lazy()
@@ -15,47 +13,25 @@ pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
 }
 
 pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
-    let value_counts = base_cm["y"].value_counts(false, false).unwrap();
-
-    let value_counts = if value_counts.height() < 4 {
-        let seen: Vec<i32> = value_counts["y"]
-            .i32()
-            .unwrap()
-            .iter()
-            .map(|x| x.unwrap())
-            .collect();
-        let not_seen: Vec<i32> = BINARY_CM_VALUES
-            .into_iter()
-            .filter(|x| !seen.contains(x))
-            .collect();
-
-        let zeros = vec![0u32; not_seen.len()];
-
-        value_counts
-            .vstack(&df!("y" => not_seen, "count" => zeros).unwrap())
-            .unwrap()
-    } else {
-        value_counts
-    };
-
-    let s: Vec<f64> = value_counts
-        .sort(["y"], Default::default())
+    let mut s = [0u32; 4];
+    for i in base_cm["y"]
+        .cast(&DataType::UInt64)
         .unwrap()
-        .column("count")
+        .u64()
         .unwrap()
-        .u32()
-        .unwrap()
-        .iter()
-        .map(|x| x.unwrap() as f64)
-        .collect();
+        .into_no_null_iter()
+    {
+        s[i as usize] += 1;
+    }
 
-    let tn = s[0];
-    let fp = s[1];
-    let fn_ = s[2];
-    let tp = s[3];
+    let tn = s[0] as f64;
+    let fp = s[1] as f64;
+    let fn_ = s[2] as f64;
+    let tp = s[3] as f64;
 
     let p = tp + fn_;
     let n = fp + tn;
+    let total = p + n;
     let tpr = tp / p;
     let fnr = 1.0 - tpr;
     let fpr = fp / n;
@@ -75,8 +51,10 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
     let f1 = (2.0 * precision * tpr) / (precision + tpr);
     let folkes_mallows_index = (precision * tpr).sqrt();
     let mcc = (tpr * tnr * precision * npv).sqrt() - (fnr * fpr * false_omission_rate * fdr).sqrt();
-    let acc = (tp + tn) / (p + n);
+    let acc = (tp + tn) / total;
     let threat_score = tp / (tp + fn_ + fp);
+    let ppr = (tp + fp) / total;
+    let pnr = (tn + fn_) / total;
 
     [
         tn,
@@ -104,12 +82,14 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
         fdr,
         npv,
         dor,
+        ppr,
+        pnr,
     ]
     .map(|x| if x.is_infinite() { f64::NAN } else { x })
 }
 
-fn transpose_confusion_matrix_results(results: Vec<[f64; 25]>) -> [Vec<f64>; 25] {
-    let mut transposed: [Vec<f64>; 25] = Default::default();
+fn transpose_confusion_matrix_results(results: Vec<[f64; 27]>) -> [Vec<f64>; 27] {
+    let mut transposed: [Vec<f64>; 27] = Default::default();
     for arr in results {
         for (i, v) in arr.into_iter().enumerate() {
             transposed[i].push(v);
