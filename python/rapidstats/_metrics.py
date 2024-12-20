@@ -314,6 +314,97 @@ def adverse_impact_ratio(
     )
 
 
+def _air_at_thresholds_core(
+    pf: PolarsFrame, thresholds: Optional[list[float]] = None
+) -> pl.LazyFrame:
+    def _appr_rate(pf: PolarsFrame) -> pl.LazyFrame:
+        return (
+            pf.lazy()
+            .sort("y_score", descending=False)
+            .with_row_index("cumulative_approved")
+            .with_columns(
+                pl.col("cumulative_approved").truediv(pl.len()).alias("appr_rate")
+            )
+            .rename({"y_score": "threshold"})
+            .unique("threshold")
+        )
+
+    p = _appr_rate(pf.filter(pl.col("protected"))).rename(
+        {"appr_rate": "appr_rate_protected"}
+    )
+
+    c = _appr_rate(pf.filter(pl.col("control"))).rename(
+        {"appr_rate": "appr_rate_control"}
+    )
+
+    if thresholds is None:
+        thresholds = pf.lazy().select("y_score").unique().collect().to_series()
+    else:
+        thresholds = set(thresholds)
+
+    p = p.pipe(_map_to_thresholds, thresholds, direction="<").with_columns(
+        pl.when(pl.col("_threshold_actual").is_null())
+        .then(1)
+        .otherwise(pl.col("appr_rate_protected"))
+        .alias("appr_rate_protected"),
+    )
+    c = c.pipe(_map_to_thresholds, thresholds, direction="<").with_columns(
+        pl.when(pl.col("_threshold_actual").is_null())
+        .then(1)
+        .otherwise(pl.col("appr_rate_control"))
+        .alias("appr_rate_control"),
+    )
+
+    return (
+        p.join(
+            c,
+            on="threshold",
+            how="left",
+            validate="1:1",
+        )
+        .with_columns(
+            pl.col("appr_rate_protected")
+            .truediv(pl.col("appr_rate_control"))
+            .alias("air")
+        )
+        .select("threshold", "air")
+    )
+
+
+def adverse_impact_ratio_at_thresholds(
+    y_score: ArrayLike,
+    protected: ArrayLike,
+    control: ArrayLike,
+    thresholds: Optional[list[float]] = None,
+    strategy: LoopStrategy = "auto",
+):
+    df = pl.DataFrame(
+        {"y_score": y_score, "protected": protected, "control": control}
+    ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
+
+    strategy = _set_loop_strategy(thresholds, strategy)
+
+    if strategy == "loop":
+
+        def _air(t):
+            return {
+                "threshold": t,
+                "air": _adverse_impact_ratio(
+                    df.select(
+                        pl.col("y_score").lt(t).alias("y_pred"), "protected", "control"
+                    )
+                ),
+            }
+
+        airs = _run_concurrent(_air, set(thresholds or y_score))
+
+        res = pl.LazyFrame(airs)
+    elif strategy == "cum_sum":
+        res = _air_at_thresholds_core(df)
+
+    return res.pipe(_fill_infinite, None).fill_nan(None).collect()
+
+
 def mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     r"""Computes Mean Squared Error (MSE) as
 
@@ -356,6 +447,23 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Root Mean Squared Error (RMSE)
     """
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
+
+
+def _set_loop_strategy(
+    thresholds: Optional[list[float]], strategy: LoopStrategy
+) -> LoopStrategy:
+    if strategy == "auto":
+        if thresholds is not None and len(thresholds) < 10:
+            return "loop"
+        else:
+            return "cum_sum"
+
+    if strategy not in ("loop", "cum_sum"):
+        raise ValueError(
+            f"Invalid strategy {strategy}, please specify one of `auto`, `loop`, or `cum_sum`."
+        )
+
+    return strategy
 
 
 def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
@@ -460,19 +568,42 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
     )
 
 
-def _filter_to_thresholds(
-    pf: PolarsFrame, thresholds: Optional[list[float]]
+def _map_to_thresholds(
+    pf: PolarsFrame,
+    thresholds: Optional[list[float]],
+    direction: Literal[">=", "<"] = ">=",
 ) -> pl.LazyFrame:
     if thresholds is None:
         return pf.lazy()
 
+    lf = pf.lazy()
+    target = pl.LazyFrame({"target_threshold": thresholds})
+
+    if direction == ">=":
+        mapping = (
+            target.join(lf.select("threshold"), how="cross")
+            .filter(pl.col("threshold").le(pl.col("target_threshold")))
+            .group_by("target_threshold")
+            .agg(pl.col("threshold").max())
+        )
+    elif direction == "<":
+        mapping = (
+            target.join(lf.select("threshold"), how="cross")
+            .filter(pl.col("threshold").ge(pl.col("target_threshold")))
+            .group_by("target_threshold")
+            .agg(pl.col("threshold").min())
+        )
+
+    mapping = target.join(
+        mapping,
+        on="target_threshold",
+        how="left",
+        validate="1:1",
+    )
+
     return (
-        pf.lazy()
-        .join(pl.LazyFrame({"target_threshold": thresholds}), how="cross")
-        .filter(pl.col("threshold").le(pl.col("target_threshold")))
-        .group_by("target_threshold")
-        .agg(pl.col("threshold").max())
-        .drop("threshold")
+        mapping.join(lf, on="threshold", how="left", validate="m:1")
+        .rename({"threshold": "_threshold_actual"})
         .rename({"target_threshold": "threshold"})
     )
 
@@ -507,11 +638,7 @@ def confusion_matrix_at_thresholds(
     pl.DataFrame
         A Polars DataFrame of `threshold`, `metric`, and `value`.
     """
-    if strategy == "auto":
-        if len(thresholds) < 10:
-            strategy = "loop"
-        else:
-            strategy = "cum_sum"
+    strategy = _set_loop_strategy(thresholds, strategy)
 
     if strategy == "loop":
         df = _y_true_y_score_to_df(y_true, y_score)
@@ -535,12 +662,8 @@ def confusion_matrix_at_thresholds(
             .pipe(_full_confusion_matrix_from_base)
             .select("threshold", *metrics)
             .unique("threshold")
-            .pipe(_filter_to_thresholds, thresholds)
+            .pipe(_map_to_thresholds, thresholds)
             .unpivot(index="threshold")
             .rename({"variable": "metric"})
             .collect()
-        )
-    else:
-        raise ValueError(
-            f"Invalid strategy {strategy}, please specify one of `auto`, `loop`, or `cum_sum`."
         )
