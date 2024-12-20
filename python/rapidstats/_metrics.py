@@ -650,9 +650,9 @@ def confusion_matrix_at_thresholds(
                 .with_columns(pl.lit(t).alias("threshold"))
             )
 
-        cms = _run_concurrent(_cm, set(thresholds or y_score))
+        cms: list[pl.DataFrame] = _run_concurrent(_cm, set(thresholds or y_score))
 
-        return pl.concat(cms, how="vertical")
+        return pl.concat(cms, how="vertical").fill_nan(None)
     elif strategy == "cum_sum":
         return (
             pl.LazyFrame({"y_true": y_true, "threshold": y_score})
