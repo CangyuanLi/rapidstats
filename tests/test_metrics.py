@@ -39,6 +39,8 @@ TRUE_SCORE_COMBOS = [
 Y_TRUE_REG = np.random.rand(N_ROWS)
 Y_SCORE_REG = np.random.rand(N_ROWS)
 
+THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
 
 def reference_f1(y_true, y_pred):
     f1 = sklearn.metrics.f1_score(
@@ -241,20 +243,6 @@ def reference_confusion_matrix_at_thresholds(y_true, y_score):
 
 
 def test_confusion_matrix_at_thresholds():
-    def assert_approx_equal(res, ref):
-        assert (
-            res.join(ref, on=["threshold", "metric"], how="inner", validate="1:1")
-            .with_columns(
-                pl.col("value")
-                .sub(pl.col("value_right"))
-                .abs()
-                .gt(1e-6)
-                .alias("is_not_approx_equal")
-            )["is_not_approx_equal"]
-            .sum()
-            == 0
-        )
-
     y_true = Y_TRUE
     y_score = Y_SCORE
 
@@ -276,6 +264,24 @@ def test_confusion_matrix_at_thresholds():
     ).sort("threshold", "metric")
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
+    # Specifying thresholds
+    thresholds = THRESHOLDS
+
+    ref = rapidstats.confusion_matrix_at_thresholds(
+        y_true,
+        y_score,
+        strategy="loop",
+        thresholds=thresholds,
+    ).sort("threshold", "metric")
+
+    res = rapidstats.confusion_matrix_at_thresholds(
+        y_true,
+        y_score,
+        strategy="cum_sum",
+        thresholds=thresholds,
+    ).sort("threshold", "metric")
+    polars.testing.assert_series_equal(ref["value"], res["value"])
+
 
 def test_adverse_impact_ratio():
     y_pred = [True] * 1_00
@@ -292,11 +298,23 @@ def test_adverse_impact_ratio_at_thresholds():
     protected = [True] * x + [False] * x
     control = [False] * x + [True] * x
 
+    # None
     ref = rapidstats.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, strategy="loop"
     ).sort("threshold")
     res = rapidstats.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, strategy="cum_sum"
+    ).sort("threshold")
+
+    polars.testing.assert_series_equal(ref["air"], res["air"])
+
+    # Specifying thresholds
+    thresholds = THRESHOLDS
+    ref = rapidstats.adverse_impact_ratio_at_thresholds(
+        Y_SCORE, protected, control, thresholds=thresholds, strategy="loop"
+    ).sort("threshold")
+    res = rapidstats.adverse_impact_ratio_at_thresholds(
+        Y_SCORE, protected, control, thresholds=thresholds, strategy="cum_sum"
     ).sort("threshold")
 
     polars.testing.assert_series_equal(ref["air"], res["air"])

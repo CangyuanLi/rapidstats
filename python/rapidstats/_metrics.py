@@ -337,18 +337,17 @@ def _air_at_thresholds_core(
         {"appr_rate": "appr_rate_control"}
     )
 
-    if thresholds is None:
-        thresholds = pf.lazy().select("y_score").unique().collect().to_series()
-    else:
-        thresholds = set(thresholds)
+    thresholds = (
+        thresholds or pf.lazy().select("y_score").unique().collect().to_series()
+    )
 
-    p = p.pipe(_map_to_thresholds, thresholds, direction="<").with_columns(
+    p = p.pipe(_map_to_thresholds, thresholds).with_columns(
         pl.when(pl.col("_threshold_actual").is_null())
         .then(1)
         .otherwise(pl.col("appr_rate_protected"))
         .alias("appr_rate_protected"),
     )
-    c = c.pipe(_map_to_thresholds, thresholds, direction="<").with_columns(
+    c = c.pipe(_map_to_thresholds, thresholds).with_columns(
         pl.when(pl.col("_threshold_actual").is_null())
         .then(1)
         .otherwise(pl.col("appr_rate_control"))
@@ -400,7 +399,7 @@ def adverse_impact_ratio_at_thresholds(
 
         res = pl.LazyFrame(airs)
     elif strategy == "cum_sum":
-        res = _air_at_thresholds_core(df)
+        res = _air_at_thresholds_core(df, thresholds)
 
     return res.pipe(_fill_infinite, None).fill_nan(None).collect()
 
@@ -571,7 +570,6 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
 def _map_to_thresholds(
     pf: PolarsFrame,
     thresholds: Optional[list[float]],
-    direction: Literal[">=", "<"] = ">=",
 ) -> pl.LazyFrame:
     if thresholds is None:
         return pf.lazy()
@@ -579,20 +577,12 @@ def _map_to_thresholds(
     lf = pf.lazy()
     target = pl.LazyFrame({"target_threshold": thresholds})
 
-    if direction == ">=":
-        mapping = (
-            target.join(lf.select("threshold"), how="cross")
-            .filter(pl.col("threshold").le(pl.col("target_threshold")))
-            .group_by("target_threshold")
-            .agg(pl.col("threshold").max())
-        )
-    elif direction == "<":
-        mapping = (
-            target.join(lf.select("threshold"), how="cross")
-            .filter(pl.col("threshold").ge(pl.col("target_threshold")))
-            .group_by("target_threshold")
-            .agg(pl.col("threshold").min())
-        )
+    mapping = (
+        target.join(lf.select("threshold"), how="cross")
+        .filter(pl.col("threshold").ge(pl.col("target_threshold")))
+        .group_by("target_threshold")
+        .agg(pl.col("threshold").min())
+    )
 
     mapping = target.join(
         mapping,
@@ -601,11 +591,13 @@ def _map_to_thresholds(
         validate="1:1",
     )
 
-    return (
+    res = (
         mapping.join(lf, on="threshold", how="left", validate="m:1")
         .rename({"threshold": "_threshold_actual"})
         .rename({"target_threshold": "threshold"})
     )
+
+    return res
 
 
 def confusion_matrix_at_thresholds(
@@ -663,6 +655,7 @@ def confusion_matrix_at_thresholds(
             .select("threshold", *metrics)
             .unique("threshold")
             .pipe(_map_to_thresholds, thresholds)
+            .drop("_threshold_actual", strict=False)
             .unpivot(index="threshold")
             .rename({"variable": "metric"})
             .collect()
