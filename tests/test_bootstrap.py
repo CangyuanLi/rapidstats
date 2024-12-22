@@ -11,6 +11,7 @@ N = 1_000
 CONFIDENCE_LEVEL = 0.95
 ALPHA = (1 - CONFIDENCE_LEVEL) / 2
 BOOTSTRAP_STATS = np.random.uniform(size=N)
+THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 
 def _alpha(confidence_level: float) -> float:
@@ -136,6 +137,55 @@ def test_bca_interval():
 @pytest.mark.parametrize(
     "bs",
     [
+        rapidstats.Bootstrap(method=method, iterations=50)
+        for method in ["standard", "percentile", "basic", "BCa"]
+    ],
+)
+def test_loop_cum_sum_shape(bs: rapidstats.Bootstrap):
+    y_true_score = np.random.rand(100)
+    y_true = y_true_score >= 0.5
+    y_score = np.random.rand(100)
+    protected = [True] * 50 + [False] * 50
+    control = [False] * 50 + [True] * 50
+
+    if bs.method != "BCa":
+        ref = bs.confusion_matrix_at_thresholds(y_true, y_score, strategy="loop")
+        res = bs.confusion_matrix_at_thresholds(y_true, y_score, strategy="cum_sum")
+
+        assert ref.shape == res.shape
+
+        ref = bs.confusion_matrix_at_thresholds(
+            y_true, y_score, thresholds=THRESHOLDS, strategy="loop"
+        )
+
+        res = bs.confusion_matrix_at_thresholds(
+            y_true, y_score, thresholds=THRESHOLDS, strategy="cum_sum"
+        )
+
+        assert ref.shape == res.shape
+
+        ref = bs.adverse_impact_ratio_at_thresholds(
+            y_score, protected, control, strategy="loop"
+        )
+        res = bs.adverse_impact_ratio_at_thresholds(
+            y_score, protected, control, strategy="cum_sum"
+        )
+
+        assert ref.shape == res.shape
+
+        ref = bs.adverse_impact_ratio_at_thresholds(
+            y_score, protected, control, thresholds=THRESHOLDS, strategy="loop"
+        )
+        res = bs.adverse_impact_ratio_at_thresholds(
+            y_score, protected, control, thresholds=THRESHOLDS, strategy="cum_sum"
+        )
+
+        assert ref.shape == res.shape
+
+
+@pytest.mark.parametrize(
+    "bs",
+    [
         rapidstats.Bootstrap(method=method, iterations=5)
         for method in ["standard", "percentile", "basic", "BCa"]
     ],
@@ -145,6 +195,8 @@ def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
     y_true = y_true_score >= 0.5
     y_score = np.random.rand(100)
     y_pred = y_score >= 0.5
+    protected = [True] * 50 + [False] * 50
+    control = [False] * 50 + [True] * 50
 
     bs.roc_auc(y_true, y_score)
     bs.brier_loss(y_true, y_score)
@@ -153,6 +205,11 @@ def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
 
     if bs.method != "BCa":
         bs.confusion_matrix_at_thresholds(y_true, y_score)
+        bs.confusion_matrix_at_thresholds(y_true, y_score, thresholds=THRESHOLDS)
+        bs.adverse_impact_ratio_at_thresholds(y_score, protected, control)
+        bs.adverse_impact_ratio_at_thresholds(
+            y_score, protected, control, thresholds=THRESHOLDS
+        )
 
     bs.adverse_impact_ratio(y_pred, y_true, y_score <= 0.5)
     bs.max_ks(y_true, y_score)

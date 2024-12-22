@@ -49,7 +49,7 @@ def _y_true_y_pred_to_df(y_true: ArrayLike, y_pred: ArrayLike) -> pl.DataFrame:
 
 
 def _fill_infinite(
-    pf: PolarsFrame, value: Union[pl.Expr, int, float, None]
+    pf: PolarsFrame, value: Union[pl.Expr, int, float, None] = None
 ) -> PolarsFrame:
     return pf.with_columns(
         pl.when(pl.selectors.float().is_infinite())
@@ -57,6 +57,12 @@ def _fill_infinite(
         .otherwise(pl.selectors.float())
         .name.keep()
     )
+
+
+def _expr_fill_infinite(
+    expr: pl.Expr, value: Union[pl.Expr, int, float, None] = None
+) -> pl.Expr:
+    return pl.when(expr.is_infinite()).then(value).otherwise(expr)
 
 
 def _run_concurrent(

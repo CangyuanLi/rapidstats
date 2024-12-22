@@ -7,6 +7,7 @@ from typing import Callable, Literal, Optional
 
 import polars as pl
 from polars.series.series import ArrayLike
+from tqdm.auto import tqdm
 
 from ._distributions import norm
 from ._metrics import (
@@ -14,9 +15,11 @@ from ._metrics import (
     DefaultConfusionMatrixMetrics,
     LoopStrategy,
     PolarsFrame,
+    _air_at_thresholds_core,
     _base_confusion_matrix_at_thresholds,
-    _filter_to_thresholds,
     _full_confusion_matrix_from_base,
+    _map_to_thresholds,
+    _set_loop_strategy,
 )
 from ._rustystats import (
     _basic_interval,
@@ -33,6 +36,8 @@ from ._rustystats import (
     _standard_interval,
 )
 from ._utils import (
+    _expr_fill_infinite,
+    _fill_infinite,
     _regression_to_df,
     _run_concurrent,
     _y_true_y_pred_to_df,
@@ -128,6 +133,37 @@ def _jacknife(
         for x in _run_concurrent(func, range(df_height), quiet=True)
         if not math.isnan(x)
     ]
+
+
+def _standard_interval_polars(lf: pl.LazyFrame, alpha: float) -> pl.LazyFrame:
+    z = norm.ppf(1 - alpha)
+
+    return (
+        lf.agg(
+            pl.col("value").mean().alias("mean"),
+            pl.col("value").std().alias("std"),
+        )
+        .with_columns(pl.col("std").mul(z).alias("x"))
+        .with_columns(
+            pl.col("mean").sub(pl.col("x")).alias("lower"),
+            pl.col("mean").add(pl.col("x")).alias("upper"),
+        )
+    )
+
+
+def _percentile_interval_polars(lf: pl.LazyFrame, alpha: float) -> pl.LazyFrame:
+    return lf.agg(
+        pl.col("value").quantile(alpha).alias("lower"),
+        pl.col("value").mean().alias("mean"),
+        pl.col("value").quantile(1 - alpha).alias("upper"),
+    )
+
+
+def _basic_interval_polars(lf: pl.LazyFrame) -> pl.LazyFrame:
+    return lf.with_columns(pl.col("original").mul(2).alias("x")).with_columns(
+        pl.col("x").sub(pl.col("upper")).alias("lower"),
+        pl.col("x").sub(pl.col("lower")).alias("upper"),
+    )
 
 
 class Bootstrap:
@@ -395,105 +431,96 @@ class Bootstrap:
         thresholds: Optional[list[float]] = None,
         metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
         strategy: LoopStrategy = "auto",
-    ) -> ConfidenceInterval:
+    ) -> pl.DataFrame:
         df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
+        strategy = _set_loop_strategy(thresholds, strategy)
+
         if strategy == "loop":
-            cms = []
-            for t in set(thresholds or y_score):
+            cms: list[pl.DataFrame] = []
+            for t in tqdm(set(thresholds or y_score)):
                 cm = (
-                    self.confusion_matrix(df["y_true"], df["y_score"].ge(t))
+                    self.confusion_matrix(df["y_true"], df["threshold"].ge(t))
                     .to_polars()
                     .with_columns(pl.lit(t).alias("threshold"))
                 )
                 cms.append(cm)
 
-            return pl.concat(cms, how="vertical").select(final_cols)
+            return pl.concat(cms, how="vertical").with_columns(
+                pl.col("lower", "mean", "upper").fill_nan(None)
+            )
+        elif strategy == "cum_sum":
 
-        def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
-            return (
-                pf.lazy()
-                .pipe(_base_confusion_matrix_at_thresholds)
-                .pipe(_full_confusion_matrix_from_base)
-                .unique("threshold")
+            def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
+                return (
+                    pf.lazy()
+                    .pipe(_base_confusion_matrix_at_thresholds)
+                    .pipe(_full_confusion_matrix_from_base)
+                    .unique("threshold")
+                )
+
+            def _cm(i: int) -> pl.LazyFrame:
+                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+
+                return _cm_inner(sample_df)
+
+            cms: list[pl.LazyFrame] = _run_concurrent(
+                _cm,
+                (
+                    (self.seed + i for i in range(self.iterations))
+                    if self.seed is not None
+                    else (None for _ in range(self.iterations))
+                ),
             )
 
-        def _cm(i: int) -> pl.LazyFrame:
-            sample_df = df.sample(fraction=1, with_replacement=True, seed=self.seed)
-
-            return _cm_inner(sample_df)
-
-        cms: list[pl.LazyFrame] = _run_concurrent(_cm, range(self.iterations))
-
-        lf = (
-            pl.concat(cms, how="vertical")
-            .select("threshold", *metrics)
-            .pipe(_filter_to_thresholds, thresholds)
-            .unpivot(index="threshold")
-            .rename({"variable": "metric"})
-            .group_by("threshold", "metric")
-        )
-
-        if self.method == "standard":
-            z = norm.ppf(1 - self.alpha)
-
-            return (
-                lf.agg(
-                    pl.col("value").mean().alias("mean"),
-                    pl.col("value").std().alias("std"),
-                )
-                .with_columns(pl.col("std").mul(z).alias("x"))
-                .with_columns(
-                    pl.col("mean").sub(pl.col("x")).alias("lower"),
-                    pl.col("mean").add(pl.col("x")).alias("upper"),
-                )
-                .select(final_cols)
-                .collect()
-            )
-        elif self.method == "percentile":
-            return (
-                lf.agg(
-                    pl.col("value").quantile(self.alpha).alias("lower"),
-                    pl.col("value").mean().alias("mean"),
-                    pl.col("value").quantile(1 - self.alpha).alias("upper"),
-                )
-                .select(final_cols)
-                .collect()
-            )
-        elif self.method == "basic":
-            original = (
-                _cm_inner(df)
+            lf = (
+                pl.concat(cms, how="vertical")
                 .select("threshold", *metrics)
-                .pipe(_filter_to_thresholds, thresholds)
+                .pipe(_map_to_thresholds, thresholds)
+                .drop("_threshold_actual", strict=False)
                 .unpivot(index="threshold")
-                .rename({"variable": "metric", "value": "original"})
+                .rename({"variable": "metric"})
+                .group_by("threshold", "metric")
             )
 
-            return (
-                lf.agg(
-                    pl.col("value").quantile(self.alpha).alias("lower"),
-                    pl.col("value").mean().alias("mean"),
-                    pl.col("value").quantile(1 - self.alpha).alias("upper"),
+            if self.method == "standard":
+                return (
+                    _standard_interval_polars(lf, self.alpha)
+                    .select(final_cols)
+                    .collect()
                 )
-                .join(
-                    original,
-                    on=["threshold", "metric"],
-                    how="left",
-                    validate="1:1",
+            elif self.method == "percentile":
+                return (
+                    _percentile_interval_polars(lf, self.alpha)
+                    .select(final_cols)
+                    .collect()
                 )
-                .with_columns(pl.col("original").mul(2).alias("x"))
-                .with_columns(
-                    pl.col("x").sub(pl.col("upper")).alias("lower"),
-                    pl.col("x").sub(pl.col("lower")).alias("upper"),
+            elif self.method == "basic":
+                original = (
+                    _cm_inner(df)
+                    .select("threshold", *metrics)
+                    .pipe(_map_to_thresholds, thresholds)
+                    .unpivot(index="threshold")
+                    .rename({"variable": "metric", "value": "original"})
                 )
-                .select(final_cols)
-                .collect()
-            )
-        elif self.method == "BCa":
-            raise NotImplementedError(
-                "BCa is not yet implemented for strategy `cum_sum`."
-            )
+
+                return (
+                    _percentile_interval_polars(lf, self.alpha)
+                    .join(
+                        original,
+                        on=["threshold", "metric"],
+                        how="left",
+                        validate="1:1",
+                    )
+                    .pipe(_basic_interval_polars)
+                    .select(final_cols)
+                    .collect()
+                )
+            elif self.method == "BCa":
+                raise NotImplementedError(
+                    "BCa is not yet implemented for strategy `cum_sum`."
+                )
 
     def roc_auc(
         self,
@@ -599,6 +626,87 @@ class Bootstrap:
         ).cast(pl.Boolean)
 
         return _bootstrap_adverse_impact_ratio(df, **self._params)
+
+    def adverse_impact_ratio_at_thresholds(
+        self,
+        y_score: ArrayLike,
+        protected: ArrayLike,
+        control: ArrayLike,
+        thresholds: Optional[list[float]] = None,
+        strategy: LoopStrategy = "auto",
+    ) -> pl.DataFrame:
+        df = pl.DataFrame(
+            {"y_score": y_score, "protected": protected, "control": control}
+        ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
+
+        strategy = _set_loop_strategy(thresholds, strategy)
+
+        if strategy == "loop":
+            airs: list[dict[str, float]] = []
+            for t in tqdm(set(thresholds or y_score)):
+                l, m, u = self.adverse_impact_ratio(
+                    df["y_score"].lt(t), df["protected"], df["control"]
+                )
+                airs.append({"threshold": t, "lower": l, "mean": m, "upper": u})
+
+            return pl.DataFrame(airs).fill_nan(None).pipe(_fill_infinite, None)
+
+        elif strategy == "cum_sum":
+
+            def _air(i: int) -> pl.LazyFrame:
+                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+
+                return _air_at_thresholds_core(sample_df, thresholds)
+
+            airs: list[pl.LazyFrame] = _run_concurrent(
+                _air,
+                (
+                    (self.seed + i for i in range(self.iterations))
+                    if self.seed is not None
+                    else (None for _ in range(self.iterations))
+                ),
+            )
+            lf = (
+                pl.concat(airs, how="vertical")
+                .rename({"air": "value"})
+                .with_columns(
+                    _expr_fill_infinite(pl.col("value").fill_nan(None)).alias("value")
+                )
+                .group_by("threshold")
+            )
+
+            final_cols = ["threshold", "lower", "mean", "upper"]
+
+            if self.method == "standard":
+                return (
+                    _standard_interval_polars(lf, self.alpha)
+                    .select(final_cols)
+                    .collect()
+                )
+            elif self.method == "percentile":
+                return (
+                    _percentile_interval_polars(lf, self.alpha)
+                    .select(final_cols)
+                    .collect()
+                )
+            elif self.method == "basic":
+                original = (
+                    _air_at_thresholds_core(df)
+                    .rename({"air": "original"})
+                    .unique("threshold")
+                )
+
+                return (
+                    _percentile_interval_polars(lf, self.alpha)
+                    .join(original, on="threshold", how="left", validate="1:1")
+                    .pipe(_basic_interval_polars)
+                    .select(final_cols)
+                    .collect()
+                )
+            elif self.method == "BCa":
+                raise NotImplementedError(
+                    "BCa not yet implemented for strategy `cum_sum`."
+                )
 
     def mean_squared_error(
         self, y_true: ArrayLike, y_score: ArrayLike

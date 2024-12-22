@@ -592,7 +592,7 @@ def _map_to_thresholds(
     )
 
     res = (
-        mapping.join(lf, on="threshold", how="left", validate="m:1")
+        mapping.join(lf, on="threshold", how="left", validate="m:m")
         .rename({"threshold": "_threshold_actual"})
         .rename({"target_threshold": "threshold"})
     )
