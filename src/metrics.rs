@@ -257,7 +257,13 @@ pub fn adverse_impact_ratio(df: DataFrame) -> f64 {
     let protected = y_pred.filter(is_protected).unwrap();
     let control = y_pred.filter(is_control).unwrap();
 
-    protected.mean().unwrap_or(f64::NAN) / control.mean().unwrap_or(f64::NAN)
+    let res = protected.mean().unwrap_or(f64::NAN) / control.mean().unwrap_or(f64::NAN);
+
+    if res.is_infinite() {
+        f64::NAN
+    } else {
+        res
+    }
 }
 
 pub fn mean_squared_error(df: DataFrame) -> f64 {
