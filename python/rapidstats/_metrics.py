@@ -338,7 +338,9 @@ def _air_at_thresholds_core(
     )
 
     thresholds = (
-        thresholds or pf.lazy().select("y_score").unique().collect().to_series()
+        thresholds
+        if thresholds is not None
+        else pf.lazy().select("y_score").unique().collect().to_series()
     )
 
     p = p.pipe(_map_to_thresholds, thresholds).with_columns(

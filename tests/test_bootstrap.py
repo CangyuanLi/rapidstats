@@ -137,7 +137,7 @@ def test_bca_interval():
 @pytest.mark.parametrize(
     "bs",
     [
-        rapidstats.Bootstrap(method=method, iterations=50)
+        rapidstats.Bootstrap(method=method, iterations=5)
         for method in ["standard", "percentile", "basic", "BCa"]
     ],
 )

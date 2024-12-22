@@ -451,6 +451,8 @@ class Bootstrap:
                 pl.col("lower", "mean", "upper").fill_nan(None)
             )
         elif strategy == "cum_sum":
+            if thresholds is None:
+                thresholds = df["threshold"].unique()
 
             def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
                 return (
@@ -458,6 +460,8 @@ class Bootstrap:
                     .pipe(_base_confusion_matrix_at_thresholds)
                     .pipe(_full_confusion_matrix_from_base)
                     .unique("threshold")
+                    .pipe(_map_to_thresholds, thresholds)
+                    .drop("_threshold_actual")
                 )
 
             def _cm(i: int) -> pl.LazyFrame:
@@ -477,8 +481,6 @@ class Bootstrap:
             lf = (
                 pl.concat(cms, how="vertical")
                 .select("threshold", *metrics)
-                .pipe(_map_to_thresholds, thresholds)
-                .drop("_threshold_actual", strict=False)
                 .unpivot(index="threshold")
                 .rename({"variable": "metric"})
                 .group_by("threshold", "metric")
@@ -652,6 +654,8 @@ class Bootstrap:
             return pl.DataFrame(airs).fill_nan(None).pipe(_fill_infinite, None)
 
         elif strategy == "cum_sum":
+            if thresholds is None:
+                thresholds = df["y_score"]
 
             def _air(i: int) -> pl.LazyFrame:
                 sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
