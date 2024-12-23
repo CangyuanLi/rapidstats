@@ -3,9 +3,11 @@ from __future__ import annotations
 import dataclasses
 import functools
 import math
+from collections.abc import Iterable
 from typing import Callable, Literal, Optional
 
 import polars as pl
+from polars.lazyframe.group_by import LazyGroupBy
 from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
@@ -135,7 +137,7 @@ def _jacknife(
     ]
 
 
-def _standard_interval_polars(lf: pl.LazyFrame, alpha: float) -> pl.LazyFrame:
+def _standard_interval_polars(lf: LazyGroupBy, alpha: float) -> pl.LazyFrame:
     z = norm.ppf(1 - alpha)
 
     return (
@@ -151,7 +153,7 @@ def _standard_interval_polars(lf: pl.LazyFrame, alpha: float) -> pl.LazyFrame:
     )
 
 
-def _percentile_interval_polars(lf: pl.LazyFrame, alpha: float) -> pl.LazyFrame:
+def _percentile_interval_polars(lf: LazyGroupBy, alpha: float) -> pl.LazyFrame:
     return lf.agg(
         pl.col("value").quantile(alpha).alias("lower"),
         pl.col("value").mean().alias("mean"),
@@ -429,7 +431,7 @@ class Bootstrap:
         y_true: ArrayLike,
         y_score: ArrayLike,
         thresholds: Optional[list[float]] = None,
-        metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
+        metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
         strategy: LoopStrategy = "auto",
     ) -> pl.DataFrame:
         """Bootstrap confusion matrix at thresholds. See
@@ -444,7 +446,7 @@ class Bootstrap:
         thresholds : Optional[list[float]], optional
             The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
             uses every score present in `y_score`, by default None
-        metrics : list[ConfusionMatrixMetric], optional
+        metrics : Iterable[ConfusionMatrixMetric], optional
             The metrics to compute, by default DefaultConfusionMatrixMetrics
         strategy : LoopStrategy, optional
             Computation method, by default "auto"

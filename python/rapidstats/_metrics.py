@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+from collections.abc import Iterable
 from typing import Literal, Optional, Union
 
 import polars as pl
@@ -54,7 +55,9 @@ ConfusionMatrixMetric = Literal[
     "pnr",
 ]
 
-DefaultConfusionMatrixMetrics = typing.get_args(ConfusionMatrixMetric)
+DefaultConfusionMatrixMetrics: tuple[ConfusionMatrixMetric] = typing.get_args(
+    ConfusionMatrixMetric
+)
 LoopStrategy = Literal["auto", "loop", "cum_sum"]
 
 
@@ -637,7 +640,7 @@ def confusion_matrix_at_thresholds(
     y_true: ArrayLike,
     y_score: ArrayLike,
     thresholds: Optional[list[float]] = None,
-    metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
+    metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
     strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
     """Computes the confusion matrix at each threshold. When the `strategy` is
@@ -660,7 +663,7 @@ def confusion_matrix_at_thresholds(
     thresholds : Optional[list[float]], optional
         The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
         uses every score present in `y_score`, by default None
-    metrics : list[ConfusionMatrixMetric], optional
+    metrics : Iterable[ConfusionMatrixMetric], optional
         The metrics to compute, by default DefaultConfusionMatrixMetrics
     strategy : LoopStrategy, optional
         Computation method, by default "auto"
