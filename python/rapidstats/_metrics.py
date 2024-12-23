@@ -288,15 +288,16 @@ def adverse_impact_ratio(
     protected: ArrayLike,
     control: ArrayLike,
 ) -> float:
-    """Computes the ratio of positive predictions for the protected class and the
-    control class. The ideal ratio is 1. For example, in an underwriting context, this
-    means that the model is equally as likely to approve protected applicants as it is
-    unprotected applicants.
+    """Computes the Adverse Impact Ratio (AIR), which is the ratio of negative
+    predictions for the protected class and the control class. The ideal ratio is 1.
+    For example, in an underwriting context, this means that the model is equally as
+    likely to approve protected applicants as it is unprotected applicants, given that
+    the model score is probability of bad.
 
     Parameters
     ----------
     y_pred : ArrayLike
-        Predicted target
+        Predicted negative
     protected : ArrayLike
         An array of booleans identifying the protected class
     control : ArrayLike
@@ -378,7 +379,37 @@ def adverse_impact_ratio_at_thresholds(
     control: ArrayLike,
     thresholds: Optional[list[float]] = None,
     strategy: LoopStrategy = "auto",
-):
+) -> pl.DataFrame:
+    """Computes the Adverse Impact Ratio (AIR) at each threshold of `y_score`. See
+    [rapidstats.adverse_impact_ratio][] for more details. When the `strategy` is
+    `cum_sum`, computes
+
+
+    ``` py
+    for t in y_score:
+        is_predicted_negative = y_score < t
+        adverse_impact_ratio(is_predicted_negative, protected, control)
+    ```
+
+    Parameters
+    ----------
+    y_score : ArrayLike
+        Predicted scores
+    protected : ArrayLike
+        An array of booleans identifying the protected class
+    control : ArrayLike
+        An array of booleans identifying the control class
+    thresholds : Optional[list[float]], optional
+        The thresholds to compute `is_predicted_negative` at, i.e. y_score < t. If None,
+        uses every score present in `y_score`, by default None
+    strategy : LoopStrategy, optional
+        Computation method, by default "auto"
+
+    Returns
+    -------
+    pl.DataFrame
+        A DataFrame of `threshold` and `air`
+    """
     df = pl.DataFrame(
         {"y_score": y_score, "protected": protected, "control": control}
     ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
@@ -609,8 +640,8 @@ def confusion_matrix_at_thresholds(
     metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
     strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
-    """Compute the confusion matrix at each threshold. When the `strategy` is "cum_sum",
-    computes
+    """Computes the confusion matrix at each threshold. When the `strategy` is
+    "cum_sum", computes
 
     ``` py
     for t in y_score:
@@ -626,11 +657,18 @@ def confusion_matrix_at_thresholds(
         Ground truth target
     y_score : ArrayLike
         Predicted scores
+    thresholds : Optional[list[float]], optional
+        The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
+        uses every score present in `y_score`, by default None
+    metrics : list[ConfusionMatrixMetric], optional
+        The metrics to compute, by default DefaultConfusionMatrixMetrics
+    strategy : LoopStrategy, optional
+        Computation method, by default "auto"
 
     Returns
     -------
     pl.DataFrame
-        A Polars DataFrame of `threshold`, `metric`, and `value`.
+        A Polars DataFrame of `threshold`, `metric`, and `value`
     """
     strategy = _set_loop_strategy(thresholds, strategy)
 

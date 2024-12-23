@@ -432,6 +432,33 @@ class Bootstrap:
         metrics: list[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
         strategy: LoopStrategy = "auto",
     ) -> pl.DataFrame:
+        """Bootstrap confusion matrix at thresholds. See
+        [rapidstats.confusion_matrix_at_thresholds][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+        thresholds : Optional[list[float]], optional
+            The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
+            uses every score present in `y_score`, by default None
+        metrics : list[ConfusionMatrixMetric], optional
+            The metrics to compute, by default DefaultConfusionMatrixMetrics
+        strategy : LoopStrategy, optional
+            Computation method, by default "auto"
+
+        Returns
+        -------
+        pl.DataFrame
+            A DataFrame of `threshold`, `metric`, `lower`, `mean`, and `upper`
+
+        Raises
+        ------
+        NotImplementedError
+            When `strategy` is `cum_sum` and `method` is `BCa`
+        """
         df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
@@ -637,6 +664,33 @@ class Bootstrap:
         thresholds: Optional[list[float]] = None,
         strategy: LoopStrategy = "auto",
     ) -> pl.DataFrame:
+        """Bootstrap AIR at thresholds. See
+        [rapidstats.adverse_impact_ratio_at_thresholds][] for more details.
+
+        Parameters
+        ----------
+        y_score : ArrayLike
+            Predicted scores
+        protected : ArrayLike
+            An array of booleans identifying the protected class
+        control : ArrayLike
+            An array of booleans identifying the control class
+        thresholds : Optional[list[float]], optional
+            The thresholds to compute `is_predicted_negative` at, i.e. y_score < t.
+            If None, uses every score present in `y_score`, by default None
+        strategy : LoopStrategy, optional
+            Computation method, by default "auto"
+
+        Returns
+        -------
+        pl.DataFrame
+            A DataFrame of `threshold`, `lower`, `mean`, and `upper`
+
+        Raises
+        ------
+        NotImplementedError
+            When `strategy` is `cum_sum` and `method` is `BCa`
+        """
         df = pl.DataFrame(
             {"y_score": y_score, "protected": protected, "control": control}
         ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
