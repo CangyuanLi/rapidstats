@@ -286,6 +286,57 @@ def mean(y: ArrayLike) -> float:
     return _mean(pl.DataFrame({"y": y}))
 
 
+def predicted_positive_ratio_at_thresholds(
+    y_score: ArrayLike,
+    thresholds: Optional[list[float]] = None,
+    strategy: LoopStrategy = "auto",
+) -> pl.DataFrame:
+    """Computes the Predicted Positive Ratio (PPR) at each threshold, where the PPR is
+    the ratio of predicted positive to the total, and a positive is defined as
+    `y_score` >= threshold.
+
+    Parameters
+    ----------
+    y_score : ArrayLike
+        Predicted scores
+    thresholds : Optional[list[float]], optional
+        The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
+        uses every score present in `y_score`, by default None
+    strategy : LoopStrategy, optional
+        Computation method, by default "auto"
+
+    Returns
+    -------
+    pl.DataFrame
+        A DataFrame of `threshold` and `ppr`
+    """
+    strategy = _set_loop_strategy(y_score, strategy)
+
+    if strategy == "loop":
+        s = pl.Series(y_score).drop_nulls()
+
+        def _ppr(t: float) -> float:
+            return {"threshold": t, "ppr": s.ge(t).mean()}
+
+        return pl.DataFrame(_run_concurrent(_ppr, set(thresholds or y_score)))
+    elif strategy == "cum_sum":
+        return (
+            pl.LazyFrame({"y_score": y_score})
+            .drop_nulls()
+            .sort("y_score", descending=True)
+            .with_row_index("cumulative_predicted_positive", offset=1)
+            .with_columns(
+                pl.col("cumulative_predicted_positive").truediv(pl.len()).alias("ppr")
+            )
+            .rename({"y_score": "threshold"})
+            .select("threshold", "ppr")
+            .unique("threshold")
+            .pipe(_map_to_thresholds, thresholds)
+            .drop("_threshold_actual", strict=False)
+            .collect()
+        )
+
+
 def adverse_impact_ratio(
     y_pred: ArrayLike,
     protected: ArrayLike,
@@ -322,6 +373,7 @@ def _air_at_thresholds_core(
     pf: PolarsFrame, thresholds: Optional[list[float]] = None
 ) -> pl.LazyFrame:
     def _appr_rate(pf: PolarsFrame) -> pl.LazyFrame:
+        # An approve is score < t
         return (
             pf.lazy()
             .sort("y_score", descending=False)
@@ -486,7 +538,7 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
 
 def _set_loop_strategy(
     thresholds: Optional[list[float]], strategy: LoopStrategy
-) -> LoopStrategy:
+) -> Literal["loop", "cum_sum"]:
     if strategy == "auto":
         if thresholds is not None and len(thresholds) < 10:
             return "loop"

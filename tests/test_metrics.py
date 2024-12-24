@@ -318,3 +318,12 @@ def test_adverse_impact_ratio_at_thresholds():
     ).sort("threshold")
 
     polars.testing.assert_series_equal(ref["air"], res["air"])
+
+
+def test_predicted_positive_ratio_at_thresholds():
+    ref = rapidstats.predicted_positive_ratio_at_thresholds(Y_SCORE).sort("threshold")
+    res = rapidstats.predicted_positive_ratio_at_thresholds(
+        Y_SCORE, strategy="cum_sum"
+    ).sort("threshold")
+
+    polars.testing.assert_series_equal(ref["ppr"], res["ppr"])

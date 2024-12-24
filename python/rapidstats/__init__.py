@@ -10,6 +10,7 @@ from ._metrics import (
     max_ks,
     mean,
     mean_squared_error,
+    predicted_positive_ratio_at_thresholds,
     roc_auc,
     root_mean_squared_error,
 )
