@@ -91,6 +91,7 @@ generate_functions!(_mean, metrics::mean);
 generate_functions!(_adverse_impact_ratio, metrics::adverse_impact_ratio);
 generate_functions!(_mean_squared_error, metrics::mean_squared_error);
 generate_functions!(_root_mean_squared_error, metrics::root_mean_squared_error);
+generate_functions!(_r2, metrics::r2);
 
 #[pyfunction]
 fn _standard_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
@@ -159,6 +160,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_mean_squared_error, m)?)?;
     m.add_function(wrap_pyfunction!(_root_mean_squared_error, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_root_mean_squared_error, m)?)?;
+    m.add_function(wrap_pyfunction!(_r2, m)?)?;
+    m.add_function(wrap_pyfunction!(_bootstrap_r2, m)?)?;
     m.add_function(wrap_pyfunction!(_standard_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_percentile_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_basic_interval, m)?)?;

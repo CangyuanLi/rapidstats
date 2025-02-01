@@ -69,6 +69,14 @@ def _bootstrap_root_mean_squared_error(
     method: BootstrapMethod,
     seed: Optional[int],
 ) -> ConfidenceInterval: ...
+def _r2(df: pl.DataFrame) -> float: ...
+def _bootstrap_r2(
+    df: pl.DataFrame,
+    iterations: int,
+    alpha: float,
+    method: BootstrapMethod,
+    seed: Optional[int],
+) -> ConfidenceInterval: ...
 def _standard_interval(
     bootstrap_stats: list[float], alpha: float
 ) -> ConfidenceInterval: ...

@@ -12,6 +12,7 @@ from ._metrics import (
     mean,
     mean_squared_error,
     predicted_positive_ratio_at_thresholds,
+    r2,
     roc_auc,
     root_mean_squared_error,
 )

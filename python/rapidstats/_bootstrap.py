@@ -32,6 +32,7 @@ from ._rustystats import (
     _bootstrap_max_ks,
     _bootstrap_mean,
     _bootstrap_mean_squared_error,
+    _bootstrap_r2,
     _bootstrap_roc_auc,
     _bootstrap_root_mean_squared_error,
     _percentile_interval,
@@ -941,3 +942,6 @@ class Bootstrap:
         return _bootstrap_root_mean_squared_error(
             _regression_to_df(y_true, y_score), **self._params
         )
+
+    def r2(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        return _bootstrap_r2(_regression_to_df(y_true, y_score), **self._params)

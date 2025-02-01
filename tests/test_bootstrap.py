@@ -215,3 +215,4 @@ def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
     bs.max_ks(y_true, y_score)
     bs.mean_squared_error(y_true_score, y_score)
     bs.root_mean_squared_error(y_true_score, y_score)
+    bs.r2(y_true_score, y_score)

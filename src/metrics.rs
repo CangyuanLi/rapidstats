@@ -1,6 +1,7 @@
 use core::f64;
 
 use crate::bootstrap;
+use ndarray::Data;
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 27];
@@ -277,4 +278,17 @@ pub fn mean_squared_error(df: DataFrame) -> f64 {
 
 pub fn root_mean_squared_error(df: DataFrame) -> f64 {
     mean_squared_error(df).sqrt()
+}
+
+pub fn r2(df: DataFrame) -> f64 {
+    let y_true = df["y_true"].f64().unwrap();
+    let y_score = df["y_score"].f64().unwrap();
+
+    let residual = &(y_true - y_score);
+    let squared_residual = residual * residual;
+    let mean = y_true.mean().unwrap();
+    let error = &(y_true - mean);
+    let squared_error = error * error;
+
+    1.0 - (squared_residual.sum().unwrap() / squared_error.sum().unwrap())
 }

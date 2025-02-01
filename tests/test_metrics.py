@@ -327,3 +327,10 @@ def test_predicted_positive_ratio_at_thresholds():
     ).sort("threshold")
 
     polars.testing.assert_series_equal(ref["ppr"], res["ppr"])
+
+
+def test_r2():
+    ref = sklearn.metrics.r2_score(Y_TRUE_REG, Y_SCORE_REG)
+    res = rapidstats.r2(Y_TRUE_REG, Y_SCORE_REG)
+
+    assert pytest.approx(res) == ref

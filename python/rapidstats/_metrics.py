@@ -13,6 +13,7 @@ from ._rustystats import (
     _max_ks,
     _mean,
     _mean_squared_error,
+    _r2,
     _roc_auc,
     _root_mean_squared_error,
 )
@@ -785,3 +786,7 @@ def capture_rate_at_quantiles(
         lf = lf.sort("quantile").drop("quantile").with_row_index("quantile", offset=1)
 
     return lf.collect()
+
+
+def r2(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    return _r2(_regression_to_df(y_true, y_score))
