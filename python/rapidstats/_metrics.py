@@ -125,9 +125,9 @@ class ConfusionMatrix:
     dor : float
         Diagnostic Odds Ratio; \( \frac{LR+}{LR-} \)
     ppr : float
-        Predicted Positive Ratio; Proportion that are predicted positive; \( \frac{TP + FP}{TN + FP + FN + TP})
+        Predicted Positive Ratio; Proportion that are predicted positive; \( \frac{TP + FP}{TN + FP + FN + TP} \)
     pnr : float
-        Predicted Negative Ratio; Proportion that are predicted negative; \( \frac{TN + FN}{TN + FP + FN + TP})
+        Predicted Negative Ratio; Proportion that are predicted negative; \( \frac{TN + FN}{TN + FP + FN + TP} \)
     """
 
     tn: float
