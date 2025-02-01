@@ -789,4 +789,22 @@ def capture_rate_at_quantiles(
 
 
 def r2(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    r"""Computes R2 as
+
+    \[
+        1 - \frac{\sum{(y_i - \hat{y_i})^2}{}}{\sum{(y_{i} - \bar{y})^2}}
+    \]
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    float
+        R2
+    """
     return _r2(_regression_to_df(y_true, y_score))

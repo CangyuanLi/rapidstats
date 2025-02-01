@@ -944,4 +944,18 @@ class Bootstrap:
         )
 
     def r2(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
+        """Bootstrap R2. See [rapidstats.r2][] for more details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         return _bootstrap_r2(_regression_to_df(y_true, y_score), **self._params)
