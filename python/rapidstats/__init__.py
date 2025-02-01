@@ -5,6 +5,7 @@ from ._metrics import (
     adverse_impact_ratio,
     adverse_impact_ratio_at_thresholds,
     brier_loss,
+    capture_rate_at_quantiles,
     confusion_matrix,
     confusion_matrix_at_thresholds,
     max_ks,

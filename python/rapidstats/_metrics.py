@@ -755,3 +755,33 @@ def confusion_matrix_at_thresholds(
             .rename({"variable": "metric"})
             .collect()
         )
+
+
+def capture_rate_at_quantiles(
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    quantiles: int = 10,
+    drop_intermediate: bool = True,
+    raw_quantiles: bool = False,
+) -> pl.DataFrame:
+    lf = (
+        _y_true_y_score_to_df(y_true=y_true, y_score=y_score)
+        .lazy()
+        .with_columns(
+            pl.col("y_score").qcut(quantiles, allow_duplicates=True).alias("quantile")
+        )
+        .group_by("quantile")
+        .agg(
+            pl.col("y_true").sum().alias("n_pos"),
+            pl.col("y_true").count().alias("n"),
+            pl.col("y_true").mean().alias("capture_rate"),
+        )
+    )
+
+    if drop_intermediate:
+        lf = lf.drop("n_pos", "n")
+
+    if not raw_quantiles:
+        lf = lf.sort("quantile").drop("quantile").with_row_index("quantile", offset=1)
+
+    return lf.collect()

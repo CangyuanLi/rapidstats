@@ -115,26 +115,20 @@ class BootstrappedConfusionMatrix:
         )
 
 
-def _bs_func(i: int, df: pl.DataFrame, stat_func: StatFunc) -> float:
+def _bs_func(i: int, df: pl.DataFrame, stat_func):
     return stat_func(df.sample(fraction=1, with_replacement=True, seed=i))
 
 
-def _js_func(i: int, df: pl.DataFrame, index: pl.Series, stat_func: StatFunc) -> float:
+def _js_func(i: int, df: pl.DataFrame, index: pl.Series, stat_func):
     return stat_func(df.filter(index.ne(i)))
 
 
-def _jacknife(
-    df: pl.DataFrame, stat_func: Callable[[pl.DataFrame], float]
-) -> list[float]:
+def _jacknife(df: pl.DataFrame, stat_func) -> list:
     df_height = df.height
     index = pl.Series("index", [i for i in range(df_height)])
     func = functools.partial(_js_func, df=df, index=index, stat_func=stat_func)
 
-    return [
-        x
-        for x in _run_concurrent(func, range(df_height), quiet=True)
-        if not math.isnan(x)
-    ]
+    return _run_concurrent(func, range(df_height), quiet=True)
 
 
 def _standard_interval_polars(lf: LazyGroupBy, alpha: float) -> pl.LazyFrame:
@@ -165,6 +159,96 @@ def _basic_interval_polars(lf: pl.LazyFrame) -> pl.LazyFrame:
     return lf.with_columns(pl.col("original").mul(2).alias("x")).with_columns(
         pl.col("x").sub(pl.col("upper")).alias("lower"),
         pl.col("x").sub(pl.col("lower")).alias("upper"),
+    )
+
+
+def _bca_interval_polars(
+    original_lf: pl.LazyFrame,
+    bootstrap_lf: pl.LazyFrame,
+    jacknife_lf: pl.LazyFrame,
+    alpha: float,
+    by,
+) -> pl.LazyFrame:
+
+    z1 = norm.ppf(alpha)
+    z2 = -z1
+
+    bcf_lf = (
+        bootstrap_lf.join(original_lf, on=by, how="left", validate="m:1")
+        .group_by(by)
+        .agg(
+            pl.col("value")
+            .lt(pl.col("original_value"))
+            .sum()
+            .add(pl.col("value").le(pl.col("original_value")).sum())
+            .truediv(pl.len().mul(2))
+            .map_elements(norm.ppf, return_dtype=pl.Float64)
+            .alias("bias_correction_factor")
+        )
+    )
+
+    acceleration_lf = (
+        jacknife_lf.with_columns(
+            pl.col("value").mean().over(by).alias("jacknife_mean"),
+            pl.col("value").count().over(by).alias("n"),
+        )
+        .with_columns(
+            pl.col("n")
+            .sub(1)
+            .mul(pl.col("jacknife_mean").sub(pl.col("value")))
+            .alias("diff")
+        )
+        .group_by(by)
+        .agg(
+            pl.col("diff").pow(3).sum().truediv(pl.len().pow(3)).alias("numerator"),
+            pl.col("diff").pow(2).sum().truediv(pl.len().pow(2)).alias("denominator"),
+        )
+        .with_columns(
+            pl.col("numerator")
+            .truediv(pl.col("denominator").pow(1.5).mul(6))
+            .alias("acceleration_factor")
+        )
+    )
+
+    p_lf = bcf_lf.join(acceleration_lf, on=by, how="left", validate="1:1").with_columns(
+        pl.col("bias_correction_factor")
+        .add(
+            pl.col("bias_correction_factor")
+            .add(z1)
+            .truediv(
+                pl.lit(1).sub(
+                    pl.col("acceleration_factor").mul(
+                        pl.col("bias_correction_factor").add(z1)
+                    )
+                )
+            )
+        )
+        .map_elements(norm.cdf, return_dtype=pl.Float64)
+        .alias("lower_p"),
+        pl.col("bias_correction_factor")
+        .add(
+            pl.col("bias_correction_factor")
+            .add(z2)
+            .truediv(
+                pl.lit(1).sub(
+                    pl.col("acceleration_factor").mul(
+                        pl.col("bias_correction_factor").add(z2)
+                    )
+                )
+            )
+        )
+        .map_elements(norm.cdf, return_dtype=pl.Float64)
+        .alias("upper_p"),
+    )
+
+    return (
+        bootstrap_lf.join(p_lf, on=by, how="left", validate="m:1")
+        .group_by(by)
+        .agg(
+            pl.col("value").quantile(pl.col("lower_p").first()).alias("lower"),
+            pl.col("value").mean().alias("mean"),
+            pl.col("value").quantile(pl.col("upper_p").first()).alias("upper"),
+        )
     )
 
 
@@ -389,7 +473,7 @@ class Bootstrap:
             return _basic_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "BCa":
             original_stat = stat_func(df)
-            jacknife_stats = _jacknife(df, stat_func)
+            jacknife_stats = [x for x in _jacknife(df, stat_func) if not math.isnan(x)]
 
             return _bca_interval(
                 original_stat, bootstrap_stats, jacknife_stats, self.alpha
@@ -507,13 +591,16 @@ class Bootstrap:
                 ),
             )
 
-            lf = (
-                pl.concat(cms, how="vertical")
-                .select("threshold", *metrics)
-                .unpivot(index="threshold")
-                .rename({"variable": "metric"})
-                .group_by("threshold", "metric")
-            )
+            def _process_results(lf: pl.LazyFrame) -> pl.LazyFrame:
+                return (
+                    lf.select("threshold", *metrics)
+                    .unpivot(index="threshold")
+                    .rename({"variable": "metric"})
+                )
+
+            bootstrap_lf = pl.concat(cms, how="vertical").pipe(_process_results)
+
+            lf = bootstrap_lf.group_by("threshold", "metric")
 
             if self.method == "standard":
                 return (
@@ -550,7 +637,29 @@ class Bootstrap:
                 )
             elif self.method == "BCa":
                 raise NotImplementedError(
-                    "BCa is not yet implemented for strategy `cum_sum`."
+                    "Method `BCa` not implemented for strategy `cum_sum` due to https://github.com/pola-rs/polars/issues/20951"
+                )
+                original_lf = (
+                    _cm_inner(df)
+                    .select("threshold", *metrics)
+                    .pipe(_map_to_thresholds, thresholds)
+                    .unpivot(index="threshold")
+                    .rename({"variable": "metric", "value": "original_value"})
+                )
+                jacknife_lf = pl.concat(_jacknife(df, _cm_inner), how="vertical").pipe(
+                    _process_results
+                )
+
+                return (
+                    _bca_interval_polars(
+                        original_lf,
+                        bootstrap_lf=bootstrap_lf,
+                        jacknife_lf=jacknife_lf,
+                        alpha=self.alpha,
+                        by=["threshold", "metric"],
+                    )
+                    .select(final_cols)
+                    .collect()
                 )
 
     def roc_auc(
@@ -726,14 +835,15 @@ class Bootstrap:
                     else (None for _ in range(self.iterations))
                 ),
             )
-            lf = (
+            bootstrap_lf = (
                 pl.concat(airs, how="vertical")
                 .rename({"air": "value"})
                 .with_columns(
                     _expr_fill_infinite(pl.col("value").fill_nan(None)).alias("value")
                 )
-                .group_by("threshold")
             )
+
+            lf = bootstrap_lf.group_by("threshold")
 
             final_cols = ["threshold", "lower", "mean", "upper"]
 
@@ -765,7 +875,29 @@ class Bootstrap:
                 )
             elif self.method == "BCa":
                 raise NotImplementedError(
-                    "BCa not yet implemented for strategy `cum_sum`."
+                    "Method `BCa` not implemented for strategy `cum_sum` due to https://github.com/pola-rs/polars/issues/20951"
+                )
+                original_lf = (
+                    _air_at_thresholds_core(df, thresholds)
+                    .rename({"air": "original_value"})
+                    .unique("threshold")
+                )
+                jacknife_lf = (
+                    pl.concat(_jacknife(df, _air_at_thresholds_core), how="vertical")
+                    .rename({"air": "value"})
+                    .unique("threshold")
+                )
+
+                return (
+                    _bca_interval_polars(
+                        original_lf,
+                        bootstrap_lf=bootstrap_lf.rename({"air": "value"}),
+                        jacknife_lf=jacknife_lf,
+                        alpha=self.alpha,
+                        by=["threshold"],
+                    )
+                    .select(final_cols)
+                    .collect()
                 )
 
     def mean_squared_error(
