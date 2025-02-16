@@ -1,4 +1,5 @@
 use bootstrap::ConfidenceInterval;
+use ndarray::Data;
 use paste::paste;
 use polars::prelude::*;
 use pyo3::exceptions::PyValueError;
@@ -7,6 +8,7 @@ use pyo3_polars::PyDataFrame;
 
 mod bootstrap;
 mod distributions;
+mod general;
 mod metrics;
 mod utils;
 
@@ -141,6 +143,26 @@ fn _norm_cdf(x: f64) -> PyResult<f64> {
     Ok(distributions::norm_cdf(x))
 }
 
+#[pyfunction]
+fn _trapezoidal_auc(df: PyDataFrame) -> PyResult<f64> {
+    let df: DataFrame = df.into();
+
+    Ok(general::trapezoidal_auc(
+        df["x"].f64().unwrap().cont_slice().unwrap(),
+        df["y"].f64().unwrap().cont_slice().unwrap(),
+    ))
+}
+
+#[pyfunction]
+fn _rectangular_auc(df: PyDataFrame) -> PyResult<f64> {
+    let df: DataFrame = df.into();
+
+    Ok(general::rectangular_auc(
+        df["x"].f64().unwrap().cont_slice().unwrap(),
+        df["y"].f64().unwrap().cont_slice().unwrap(),
+    ))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -168,6 +190,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
+    m.add_function(wrap_pyfunction!(_rectangular_auc, m)?)?;
+    m.add_function(wrap_pyfunction!(_trapezoidal_auc, m)?)?;
 
     Ok(())
 }
