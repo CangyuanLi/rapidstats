@@ -34,7 +34,7 @@ def test_standard_interval():
     rs = rapidstats._bootstrap._standard_interval(BOOTSTRAP_STATS, ALPHA)
     ref = reference_standard_interval(BOOTSTRAP_STATS, CONFIDENCE_LEVEL)
 
-    pytest.approx(rs) == ref
+    assert pytest.approx(rs) == ref
 
 
 def reference_percentile_interval(bootstrap_stats, confidence_level):
