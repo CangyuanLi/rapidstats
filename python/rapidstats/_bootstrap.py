@@ -693,6 +693,21 @@ class Bootstrap:
     def average_precision(
         self, y_true: ArrayLike, y_score: ArrayLike
     ) -> ConfidenceInterval:
+        """Bootstrap average precision. See [rapidstats.average_precision][] for more
+        details.
+
+        Parameters
+        ----------
+        y_true : ArrayLike
+            Ground truth target
+        y_score : ArrayLike
+            Predicted scores
+
+        Returns
+        -------
+        ConfidenceInterval
+            A tuple of (lower, mean, upper)
+        """
         df = (
             _y_true_y_score_to_df(y_true, y_score)
             .rename({"y_score": "threshold"})
