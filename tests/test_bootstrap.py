@@ -199,6 +199,7 @@ def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
     control = [False] * 50 + [True] * 50
 
     bs.roc_auc(y_true, y_score)
+    bs.average_precision(y_true, y_score)
     bs.brier_loss(y_true, y_score)
     bs.mean(y_score)
     bs.confusion_matrix(y_true, y_pred)

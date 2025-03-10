@@ -18,11 +18,13 @@ from ._metrics import (
     LoopStrategy,
     PolarsFrame,
     _air_at_thresholds_core,
+    _ap_from_pr_curve,
     _base_confusion_matrix_at_thresholds,
     _full_confusion_matrix_from_base,
     _map_to_thresholds,
     _set_loop_strategy,
 )
+from ._metrics import average_precision as _ap
 from ._rustystats import (
     _basic_interval,
     _bca_interval,
@@ -687,6 +689,89 @@ class Bootstrap:
         )
 
         return _bootstrap_roc_auc(df, **self._params)
+
+    def average_precision(
+        self, y_true: ArrayLike, y_score: ArrayLike
+    ) -> ConfidenceInterval:
+        df = (
+            _y_true_y_score_to_df(y_true, y_score)
+            .rename({"y_score": "threshold"})
+            .drop_nulls()
+        )
+
+        def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
+            return (
+                pf.lazy()
+                .pipe(_base_confusion_matrix_at_thresholds)
+                .pipe(_full_confusion_matrix_from_base)
+                .select("threshold", "precision", "tpr")
+            )
+
+        def _cm(i: int) -> pl.LazyFrame:
+            sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+
+            return _cm_inner(sample_df)
+
+        cms: list[pl.LazyFrame] = _run_concurrent(
+            _cm,
+            (
+                (self.seed + i for i in range(self.iterations))
+                if self.seed is not None
+                else (None for _ in range(self.iterations))
+            ),
+        )
+
+        cms = [
+            cm.with_columns(pl.lit(i).alias("iteration")) for i, cm in enumerate(cms)
+        ]
+
+        bootstrap_stats = (
+            pl.concat(cms, how="vertical")
+            .sort("threshold")
+            .group_by("iteration", maintain_order=True)
+            .agg(
+                _ap_from_pr_curve(pl.col("precision"), pl.col("tpr")).alias(
+                    "average_precision"
+                )
+            )
+            .collect()["average_precision"]
+            .to_list()
+        )
+
+        if self.method == "standard":
+            return _standard_interval(bootstrap_stats, self.alpha)
+        elif self.method == "percentile":
+            return _percentile_interval(bootstrap_stats, self.alpha)
+        elif self.method == "basic":
+            original_stat = _ap(y_true, y_score)
+
+            return _basic_interval(original_stat, bootstrap_stats, self.alpha)
+        elif self.method == "BCa":
+            original_stat = _ap(y_true, y_score)
+
+            def _cm_jacknife(i):
+                j_df = df.filter(pl.col("index").ne(i))
+
+                return _cm_inner(j_df).with_columns(pl.lit(i).alias("iteration"))
+
+            df = df.with_row_index("index")
+            cms = _run_concurrent(_cm_jacknife, range(df.height))
+            jacknife_stats = (
+                pl.concat(cms, how="vertical")
+                .sort("threshold")
+                .group_by("iteration", maintain_order=True)
+                .agg(
+                    _ap_from_pr_curve(pl.col("precision"), pl.col("tpr")).alias(
+                        "average_precision"
+                    )
+                )
+                .collect()["average_precision"]
+                .to_list()
+            )
+
+            return _bca_interval(
+                original_stat, bootstrap_stats, jacknife_stats, self.alpha
+            )
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
         """Bootstrap Max-KS. See [rapidstats.max_ks][] for more details.
