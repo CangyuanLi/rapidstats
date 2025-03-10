@@ -22,7 +22,7 @@ def reference_standard_interval(bootstrap_stats, confidence_level):
     alpha = _alpha(confidence_level)
 
     mean = np.mean(bootstrap_stats)
-    stdev = np.std(bootstrap_stats)
+    stdev = np.std(bootstrap_stats, ddof=1)
     stderr = stdev
     z = scipy.stats.norm.ppf(1 - alpha)
     x = z * stderr
@@ -34,7 +34,7 @@ def test_standard_interval():
     rs = rapidstats._bootstrap._standard_interval(BOOTSTRAP_STATS, ALPHA)
     ref = reference_standard_interval(BOOTSTRAP_STATS, CONFIDENCE_LEVEL)
 
-    assert pytest.approx(rs) == ref
+    assert pytest.approx((rs[0], rs[2])) == ref
 
 
 def reference_percentile_interval(bootstrap_stats, confidence_level):
