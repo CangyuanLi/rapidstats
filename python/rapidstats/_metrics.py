@@ -758,6 +758,33 @@ def confusion_matrix_at_thresholds(
         )
 
 
+def _ap_from_pr_curve(precision: pl.Expr, recall: pl.Expr) -> pl.Expr:
+    return (
+        recall.extend_constant(0.0, 1)
+        .diff(null_behavior="drop")
+        .mul(precision)
+        .sum()
+        .mul(-1)
+    )
+
+
+def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    return (
+        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+        .with_columns(pl.col("y_true").cast(pl.Boolean))
+        .drop_nulls()
+        .pipe(_base_confusion_matrix_at_thresholds)
+        .pipe(_full_confusion_matrix_from_base)
+        .select("threshold", "precision", "tpr")
+        .drop_nulls()
+        .unique("threshold")
+        .sort("threshold")
+        .select(_ap_from_pr_curve(pl.col("precision"), pl.col("tpr")).alias("ap"))
+        .collect()["ap"]
+        .item()
+    )
+
+
 def capture_rate_at_quantiles(
     y_true: ArrayLike,
     y_score: ArrayLike,

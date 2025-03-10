@@ -1,3 +1,5 @@
+from rapidstats import polars
+
 from ._bootstrap import Bootstrap
 from ._corr import correlation_matrix
 from ._distributions import norm
@@ -5,6 +7,7 @@ from ._general import auc
 from ._metrics import (
     adverse_impact_ratio,
     adverse_impact_ratio_at_thresholds,
+    average_precision,
     brier_loss,
     capture_rate_at_quantiles,
     confusion_matrix,
