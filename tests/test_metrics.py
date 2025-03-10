@@ -198,12 +198,12 @@ def reference_max_ks(y_true, y_score):
         return float("nan")
 
 
-# @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
-# def test_max_ks(y_true, y_score):
-#     ref = reference_max_ks(y_true, y_score)
-#     fs = rapidstats.max_ks(y_true, y_score)
+@pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
+def test_max_ks(y_true, y_score):
+    ref = reference_max_ks(y_true, y_score)
+    fs = rapidstats.max_ks(y_true, y_score)
 
-#     assert pytest.approx(fs) == ref
+    assert pytest.approx(fs, nan_ok=True) == ref
 
 
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
