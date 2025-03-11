@@ -1,0 +1,42 @@
+from pathlib import Path
+from typing import Literal, Union
+
+import polars as pl
+
+PolarsFrame = Union[pl.DataFrame, pl.LazyFrame]
+IntoExpr = Union[str, pl.Expr]
+
+_PLUGIN_PATH = Path(__file__).resolve().parent
+
+
+def _into_expr(expr: IntoExpr) -> pl.Expr:
+    if isinstance(expr, str):
+        return pl.col(expr)
+    elif isinstance(expr, pl.Expr):
+        return expr
+    else:
+        raise ValueError("Must be of type `str` or `pl.Expr`")
+
+
+def auc(
+    x: IntoExpr,
+    y: IntoExpr,
+    method: Literal["rectangular", "trapezoidal"] = "trapezoidal",
+) -> pl.Expr:
+    if method == "trapezoidal":
+        is_trapezoidal = True
+    elif method == "rectangular":
+        is_trapezoidal = False
+    else:
+        raise ValueError("`method` must be one of `rectangular` or `trapezoidal`")
+
+    return pl.plugins.register_plugin_function(
+        plugin_path=_PLUGIN_PATH,
+        function_name="pl_auc",
+        args=[
+            _into_expr(x).cast(pl.Float64),
+            _into_expr(y).cast(pl.Float64),
+            pl.lit(is_trapezoidal),
+        ],
+        returns_scalar=True,
+    )

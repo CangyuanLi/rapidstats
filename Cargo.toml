@@ -5,15 +5,15 @@ edition = "2021"
 
 [lib]
 name = "rapidstats"
-crate-type = [ "cdylib",]
+crate-type = ["cdylib"]
 
 [dependencies]
 ndarray = "0.15.6"
 paste = "1.0.15"
 pyo3 = "0.21.0"
-pyo3-polars = "0.14.0"
+pyo3-polars = { version = "0.14.0", features = ["derive"] }
 rayon = "1.10.0"
 
 [dependencies.polars]
 version = "0.40.0"
-features = [ "performant", "random", "lazy", "cum_agg", "unique_counts",]
+features = ["performant", "random", "lazy", "cum_agg", "unique_counts"]
