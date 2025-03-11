@@ -51,3 +51,22 @@ def test_auc(x, y):
     # Test that rectangular works
     # TODO: Find library that implements rectangular AUC to test against
     rs_auc(x, y, method="rectangular")
+
+
+def test_is_close():
+    df = pl.DataFrame(
+        {
+            "a": [float("nan"), None, 0.00001, 0.01, 0.01],
+            "b": [float("nan"), None, 0.000010000000000067, 0.02, 0.01],
+            "correct": [True, None, True, False, True],
+            "correct_null_equal": [True, True, True, False, True],
+        }
+    ).with_columns(
+        rapidstats.polars.is_close("a", "b", null_equal=False).alias("is_close"),
+        rapidstats.polars.is_close("a", "b", null_equal=True).alias(
+            "is_close_null_equal"
+        ),
+    )
+
+    assert df["correct"].eq(df["is_close"]).sum() == 4
+    assert df["correct_null_equal"].eq(df["is_close_null_equal"]).sum() == 5

@@ -40,3 +40,21 @@ def auc(
         ],
         returns_scalar=True,
     )
+
+
+def is_close(
+    x: IntoExpr,
+    y: IntoExpr,
+    rtol: float = 1e-05,
+    atol: float = 1e-08,
+    null_equal: bool = False,
+) -> pl.Expr:
+    x = _into_expr(x)
+    y = _into_expr(y)
+
+    res = x.sub(y).abs().le(pl.lit(atol).add(rtol).mul(y.abs()))
+
+    if null_equal:
+        res = res.or_(x.is_null().and_(y.is_null()))
+
+    return res
