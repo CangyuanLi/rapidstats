@@ -1,4 +1,4 @@
-from rapidstats import polars
+from rapidstats import polars, preprocessing
 
 from ._bootstrap import Bootstrap
 from ._corr import correlation_matrix
