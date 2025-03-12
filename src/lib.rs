@@ -1,5 +1,4 @@
 use bootstrap::ConfidenceInterval;
-use ndarray::Data;
 use paste::paste;
 use polars::prelude::*;
 use pyo3::exceptions::PyValueError;
@@ -10,7 +9,6 @@ mod bootstrap;
 mod distributions;
 mod general;
 mod metrics;
-mod utils;
 
 macro_rules! generate_functions {
     ($func_name:ident, $metric_func:path) => {

@@ -1,7 +1,6 @@
 use core::f64;
 
 use crate::bootstrap;
-use ndarray::Data;
 use polars::prelude::*;
 
 pub type ConfusionMatrixArray = [f64; 27];
