@@ -65,13 +65,20 @@ class OneHotEncoder:
         pass
 
     def fit(self, X: nwt.IntoDataFrameT):
-        pass
+        X = nw.from_native(X, eager_only=True)
 
-    def transform(self):
-        pass
+        self.categories_ = {c: X[c].drop_nulls().unique() for c in X.columns}
 
-    def fit_transforrm(self):
-        pass
+        return self
 
-    def run(self):
-        pass
+    @nw.narwhalify
+    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        for c, unique_vals in self.categories_.items():
+            for val in unique_vals:
+                X = X.with_columns(nw.col(c).__eq__(val).alias(f"{c}_{val}"))
+
+        return X
+
+    @nw.narwhalify
+    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return self.fit(X).transform(X)

@@ -46,3 +46,25 @@ def test_min_max_scaler():
     polars.testing.assert_frame_equal(
         data, scaler.inverse_transform(scaler.fit_transform(data))
     )
+
+
+def test_one_hot_encoder():
+    df1 = pl.DataFrame({"x": ["a", None, "b"]})
+    df2 = pl.DataFrame({"x": ["a", None, "a"]})
+
+    encoder = rapidstats.preprocessing.OneHotEncoder().fit(df1)
+
+    polars.testing.assert_frame_equal(
+        df1.with_columns(
+            pl.Series("x_a", [True, None, False]),
+            pl.Series("x_b", [False, None, True]),
+        ),
+        df1.pipe(encoder.transform),
+    )
+
+    polars.testing.assert_frame_equal(
+        df2.with_columns(
+            pl.Series("x_a", [True, None, True]), pl.Series("x_b", [False, None, False])
+        ),
+        df2.pipe(encoder.transform),
+    )
