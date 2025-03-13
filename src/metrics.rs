@@ -12,7 +12,7 @@ pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
         .unwrap()
 }
 
-pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
+pub fn confusion_matrix(base_cm: DataFrame, beta: f64) -> ConfusionMatrixArray {
     let mut s = [0u32; 4];
     for i in base_cm["y"]
         .cast(&DataType::UInt64)
@@ -48,7 +48,7 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
     let markedness = precision - false_omission_rate;
     let dor = plr / nlr;
     let balanced_accuracy = (tpr + tnr) / 2.0;
-    let f1 = (2.0 * precision * tpr) / (precision + tpr);
+    let fbeta = ((1.0 + beta.powi(2)) * precision * tpr) / ((beta.powi(2) * precision) + tpr);
     let folkes_mallows_index = (precision * tpr).sqrt();
     let mcc = (tpr * tnr * precision * npv).sqrt() - (fnr * fpr * false_omission_rate * fdr).sqrt();
     let acc = (tp + tn) / total;
@@ -74,7 +74,7 @@ pub fn confusion_matrix(base_cm: DataFrame) -> ConfusionMatrixArray {
         nlr,
         acc,
         balanced_accuracy,
-        f1,
+        fbeta,
         folkes_mallows_index,
         mcc,
         threat_score,
@@ -101,6 +101,7 @@ fn transpose_confusion_matrix_results(results: Vec<[f64; 27]>) -> [Vec<f64>; 27]
 
 pub fn bootstrap_confusion_matrix(
     df: DataFrame,
+    beta: f64,
     iterations: u64,
     alpha: f64,
     method: &str,
@@ -114,7 +115,7 @@ pub fn bootstrap_confusion_matrix(
         base_cm.clone(),
         iterations,
         seed,
-        confusion_matrix,
+        |x| confusion_matrix(x, beta),
         n_jobs,
         chunksize,
     );
@@ -131,7 +132,7 @@ pub fn bootstrap_confusion_matrix(
             .map(|bs| bootstrap::percentile_interval(bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "basic" {
-        let original_stats = confusion_matrix(base_cm.clone());
+        let original_stats = confusion_matrix(base_cm.clone(), beta);
 
         original_stats
             .into_iter()
@@ -139,8 +140,8 @@ pub fn bootstrap_confusion_matrix(
             .map(|(original_stat, bs)| bootstrap::basic_interval(original_stat, bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "BCa" {
-        let original_stats = confusion_matrix(base_cm.clone());
-        let jacknife_stats = bootstrap::run_jacknife(base_cm, confusion_matrix);
+        let original_stats = confusion_matrix(base_cm.clone(), beta);
+        let jacknife_stats = bootstrap::run_jacknife(base_cm, |x| confusion_matrix(x, beta));
         let js_transposed = transpose_confusion_matrix_results(jacknife_stats);
 
         original_stats

@@ -79,7 +79,7 @@ class BootstrappedConfusionMatrix:
     nlr: ConfidenceInterval
     acc: ConfidenceInterval
     balanced_accuracy: ConfidenceInterval
-    f1: ConfidenceInterval
+    fbeta: ConfidenceInterval
     folkes_mallows_index: ConfidenceInterval
     mcc: ConfidenceInterval
     threat_score: ConfidenceInterval
@@ -490,6 +490,7 @@ class Bootstrap:
         self,
         y_true: ArrayLike,
         y_pred: ArrayLike,
+        beta: float = 1.0,
     ) -> BootstrappedConfusionMatrix:
         """Bootstrap confusion matrix. See [rapidstats.confusion_matrix][] for
         more details.
@@ -510,7 +511,7 @@ class Bootstrap:
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
         return BootstrappedConfusionMatrix(
-            *_bootstrap_confusion_matrix(df, **self._params)
+            *_bootstrap_confusion_matrix(df, beta, **self._params)
         )
 
     def confusion_matrix_at_thresholds(

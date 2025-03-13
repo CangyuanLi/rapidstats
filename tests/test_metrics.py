@@ -48,7 +48,7 @@ def reference_f1(y_true, y_pred):
     return f1
 
 
-def reference_confusion_matrix(y_true, y_pred):
+def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
     tn, fp, fn_, tp = sklearn.metrics.confusion_matrix(
         y_true, y_pred, labels=[False, True]
     ).ravel()
@@ -73,7 +73,9 @@ def reference_confusion_matrix(y_true, y_pred):
     markedness = precision - false_omission_rate
     dor = plr / nlr
     balanced_accuracy = (tpr + tnr) / 2
-    f1 = reference_f1(y_true, y_pred)
+    fbeta = sklearn.metrics.fbeta_score(
+        y_true, y_pred, beta=beta, labels=[False, True], zero_division=np.nan
+    )
     folkes_mallows_index = np.sqrt(precision * tpr)
     mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
         fnr * fpr * false_omission_rate * fdr
@@ -104,7 +106,7 @@ def reference_confusion_matrix(y_true, y_pred):
                 nlr,
                 acc,
                 balanced_accuracy,
-                f1,
+                fbeta,
                 folkes_mallows_index,
                 mcc,
                 threat_score,
@@ -143,7 +145,7 @@ def test_bootstrap_f1(y_true, y_pred):
         rs = (
             rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED + i)
             .confusion_matrix(y_true, y_pred)
-            .f1
+            .fbeta
         )
         rs_res.append((rs[0], rs[2]))
 
@@ -163,6 +165,21 @@ def test_bootstrap_f1(y_true, y_pred):
 
     assert pytest.approx(rs_lower, rel=1e-2) == ref_lower
     assert pytest.approx(rs_upper, rel=1e-2) == ref_upper
+
+
+@pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
+def test_fbeta(y_true, y_pred):
+    for beta in (0.1, 1, 8, 94):
+        ref = sklearn.metrics.fbeta_score(
+            y_true,
+            y_pred,
+            beta=beta,
+            labels=[False, True],
+            zero_division=np.nan,
+        )
+        res = rapidstats.confusion_matrix(y_true, y_pred, beta=beta).fbeta
+
+        assert pytest.approx(ref, nan_ok=True) == res
 
 
 def reference_roc_auc(y_true, y_score):
@@ -236,11 +253,11 @@ def test_root_mean_squared_error():
     assert pytest.approx(res) == ref
 
 
-def reference_confusion_matrix_at_thresholds(y_true, y_score):
+def reference_confusion_matrix_at_thresholds(y_true, y_score, beta):
     cms = []
     for t in y_score:
         cms.append(
-            reference_confusion_matrix(y_true, y_score >= t)
+            reference_confusion_matrix(y_true, y_score >= t, beta)
             .to_polars()
             .with_columns(pl.lit(t).alias("threshold"))
         )
@@ -248,25 +265,26 @@ def reference_confusion_matrix_at_thresholds(y_true, y_score):
     return pl.concat(cms, how="vertical_relaxed")
 
 
-def test_confusion_matrix_at_thresholds():
+@pytest.mark.parametrize("beta", [0.1, 1, 11])
+def test_confusion_matrix_at_thresholds(beta):
     y_true = Y_TRUE
     y_score = Y_SCORE
 
     ref = (
-        reference_confusion_matrix_at_thresholds(y_true, y_score)
+        reference_confusion_matrix_at_thresholds(y_true, y_score, beta=beta)
         .fill_nan(None)
         .sort(["threshold", "metric"])
     )
 
     # loop
     res = rapidstats.confusion_matrix_at_thresholds(
-        y_true, y_score, strategy="loop"
+        y_true, y_score, beta=beta, strategy="loop"
     ).sort("threshold", "metric")
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
     # cum_sum
     res = rapidstats.confusion_matrix_at_thresholds(
-        y_true, y_score, strategy="cum_sum"
+        y_true, y_score, beta=beta, strategy="cum_sum"
     ).sort("threshold", "metric")
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
@@ -276,6 +294,7 @@ def test_confusion_matrix_at_thresholds():
     ref = rapidstats.confusion_matrix_at_thresholds(
         y_true,
         y_score,
+        beta=beta,
         strategy="loop",
         thresholds=thresholds,
     ).sort("threshold", "metric")
@@ -283,6 +302,7 @@ def test_confusion_matrix_at_thresholds():
     res = rapidstats.confusion_matrix_at_thresholds(
         y_true,
         y_score,
+        beta=beta,
         strategy="cum_sum",
         thresholds=thresholds,
     ).sort("threshold", "metric")

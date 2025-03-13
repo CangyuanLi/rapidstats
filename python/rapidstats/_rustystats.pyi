@@ -5,9 +5,10 @@ import polars as pl
 ConfidenceInterval = tuple[float, float, float]
 BootstrapMethod = Literal["standard", "percentile", "basic", "BCa"]
 
-def _confusion_matrix(df: pl.DataFrame) -> list[float]: ...
+def _confusion_matrix(df: pl.DataFrame, beta: float) -> list[float]: ...
 def _bootstrap_confusion_matrix(
     df: pl.DataFrame,
+    beta: float,
     iterations: int,
     alpha: float,
     method: BootstrapMethod,

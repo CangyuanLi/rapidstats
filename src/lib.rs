@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use bootstrap::ConfidenceInterval;
 use paste::paste;
 use polars::prelude::*;
@@ -60,16 +62,17 @@ macro_rules! generate_functions {
 }
 
 #[pyfunction]
-fn _confusion_matrix(df: PyDataFrame) -> PyResult<metrics::ConfusionMatrixArray> {
+fn _confusion_matrix(df: PyDataFrame, beta: f64) -> PyResult<metrics::ConfusionMatrixArray> {
     let df: DataFrame = df.into();
     let base_cm = metrics::base_confusion_matrix(df);
 
-    Ok(metrics::confusion_matrix(base_cm))
+    Ok(metrics::confusion_matrix(base_cm, beta))
 }
 
 #[pyfunction]
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
+    beta: f64,
     iterations: u64,
     alpha: f64,
     method: &str,
@@ -80,7 +83,7 @@ fn _bootstrap_confusion_matrix(
     let df: DataFrame = df.into();
 
     Ok(metrics::bootstrap_confusion_matrix(
-        df, iterations, alpha, method, seed, n_jobs, chunksize,
+        df, beta, iterations, alpha, method, seed, n_jobs, chunksize,
     ))
 }
 

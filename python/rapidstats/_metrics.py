@@ -44,7 +44,7 @@ ConfusionMatrixMetric = Literal[
     "nlr",
     "acc",
     "balanced_accuracy",
-    "f1",
+    "fbeta",
     "folkes_mallows_index",
     "mcc",
     "threat_score",
@@ -108,8 +108,8 @@ class ConfusionMatrix:
         ↑Accuracy (ACC); Probability of a correct prediction; \( \frac{TP + TN}{TN + FP + FN + TP} \)
     balanced_accuracy : float
         ↑Balanced Accuracy (BA); \( \frac{TP + TN}{2} \)
-    f1 : float
-        ↑F1; Harmonic mean of Precision and Recall; \( \frac{2 \times PPV \times TPR}{PPV + TPR} \)
+    fbeta : float
+        ↑\( F_{\beta} \); Harmonic mean of Precision and Recall; \( \frac{(1 + \beta)^2 \times PPV \times TPR}{(\beta^2 * PPV) + TPR} \)
     folkes_mallows_index : float
         ↑Folkes Mallows Index (FM); \( \sqrt{PPV \times TPR} \)
     mcc : float
@@ -147,7 +147,7 @@ class ConfusionMatrix:
     nlr: float
     acc: float
     balanced_accuracy: float
-    f1: float
+    fbeta: float
     folkes_mallows_index: float
     mcc: float
     threat_score: float
@@ -172,8 +172,10 @@ class ConfusionMatrix:
         return pl.DataFrame({"metric": dct.keys(), "value": dct.values()})
 
 
-def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
-    """Computes confusion matrix metrics (TP, FP, TN, FN, TPR, F1, etc.).
+def confusion_matrix(
+    y_true: ArrayLike, y_pred: ArrayLike, beta: float = 1.0
+) -> ConfusionMatrix:
+    """Computes confusion matrix metrics (TP, FP, TN, FN, TPR, Fbeta, etc.).
 
     Parameters
     ----------
@@ -189,7 +191,7 @@ def confusion_matrix(y_true: ArrayLike, y_pred: ArrayLike) -> ConfusionMatrix:
     """
     df = _y_true_y_pred_to_df(y_true, y_pred)
 
-    return ConfusionMatrix(*_confusion_matrix(df))
+    return ConfusionMatrix(*_confusion_matrix(df, beta))
 
 
 def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
@@ -577,7 +579,9 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
     )
 
 
-def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
+def _full_confusion_matrix_from_base(pf: PolarsFrame, beta: float = 1.0) -> PolarsFrame:
+    beta_squared = beta**2
+
     return (
         pf.with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
@@ -603,11 +607,11 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame) -> PolarsFrame:
             .sub(1)
             .alias("informedness"),
             pl.col("precision").sub(pl.col("false_omission_rate")).alias("markedness"),
-            pl.lit(2)
+            pl.lit(1 + beta_squared)
             .mul(pl.col("precision"))
             .mul(pl.col("tpr"))
-            .truediv(pl.col("precision").add(pl.col("tpr")))
-            .alias("f1"),
+            .truediv(pl.lit(beta_squared).mul(pl.col("precision")).add(pl.col("tpr")))
+            .alias("fbeta"),
             (pl.col("precision").mul(pl.col("tpr")))
             .sqrt()
             .alias("folkes_mallows_index"),
@@ -695,6 +699,7 @@ def confusion_matrix_at_thresholds(
     thresholds: Optional[list[float]] = None,
     metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
     strategy: LoopStrategy = "auto",
+    beta: float = 1.0,
 ) -> pl.DataFrame:
     """Computes the confusion matrix at each threshold. When the `strategy` is
     "cum_sum", computes
@@ -733,7 +738,7 @@ def confusion_matrix_at_thresholds(
 
         def _cm(t):
             return (
-                confusion_matrix(df["y_true"], df["y_score"].ge(t))
+                confusion_matrix(df["y_true"], df["y_score"].ge(t), beta=beta)
                 .to_polars()
                 .with_columns(pl.lit(t).alias("threshold"))
             )
@@ -747,7 +752,7 @@ def confusion_matrix_at_thresholds(
             .with_columns(pl.col("y_true").cast(pl.Boolean))
             .drop_nulls()
             .pipe(_base_confusion_matrix_at_thresholds)
-            .pipe(_full_confusion_matrix_from_base)
+            .pipe(_full_confusion_matrix_from_base, beta=beta)
             .select("threshold", *metrics)
             .unique("threshold")
             .pipe(_map_to_thresholds, thresholds)

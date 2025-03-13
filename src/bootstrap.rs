@@ -105,13 +105,16 @@ fn create_rayon_pool(n_jobs: usize) -> rayon::ThreadPool {
         .unwrap()
 }
 
-fn bootstrap_core<T: Send + Sync>(
+fn bootstrap_core<T: Send + Sync, F>(
     df: DataFrame,
     iterations: u64,
     seed: Option<u64>,
-    func: fn(DataFrame) -> T,
+    func: F,
     chunksize: Option<usize>,
-) -> Vec<T> {
+) -> Vec<T>
+where
+    F: Fn(DataFrame) -> T + Send + Sync,
+{
     let df_height = df.height();
 
     let seeds: Vec<u64> = (0..iterations).collect();
@@ -147,14 +150,17 @@ fn bootstrap_core<T: Send + Sync>(
     res
 }
 
-pub fn run_bootstrap<T: Send + Sync>(
+pub fn run_bootstrap<T: Send + Sync, F>(
     df: DataFrame,
     iterations: u64,
     seed: Option<u64>,
-    func: fn(DataFrame) -> T,
+    func: F,
     n_jobs: Option<usize>,
     chunksize: Option<usize>,
-) -> Vec<T> {
+) -> Vec<T>
+where
+    F: Fn(DataFrame) -> T + Send + Sync,
+{
     let df_height = df.height();
 
     let bootstrap_stats: Vec<T> = if n_jobs == Some(1) {
@@ -176,7 +182,10 @@ pub fn run_bootstrap<T: Send + Sync>(
     bootstrap_stats
 }
 
-pub fn run_jacknife<T: Send + Sync>(df: DataFrame, func: fn(DataFrame) -> T) -> Vec<T> {
+pub fn run_jacknife<T: Send + Sync, F>(df: DataFrame, func: F) -> Vec<T>
+where
+    F: Fn(DataFrame) -> T + Send + Sync,
+{
     let df_height = df.height();
     let index = ChunkedArray::new("index", 0..df_height as u64);
     let jacknife_stats: Vec<T> = (0..df_height)
