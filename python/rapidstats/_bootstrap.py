@@ -523,8 +523,9 @@ class Bootstrap:
         thresholds: Optional[list[float]] = None,
         metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
         strategy: LoopStrategy = "auto",
+        beta: float = 1.0,
     ) -> pl.DataFrame:
-        """Bootstrap confusion matrix at thresholds. See
+        r"""Bootstrap confusion matrix at thresholds. See
         [rapidstats.confusion_matrix_at_thresholds][] for more details.
 
         Parameters
@@ -540,6 +541,8 @@ class Bootstrap:
             The metrics to compute, by default DefaultConfusionMatrixMetrics
         strategy : LoopStrategy, optional
             Computation method, by default "auto"
+        beta : float, optional
+            \( \beta \) to use in \( F_\beta \), by default 1
 
         Returns
         -------
@@ -560,7 +563,9 @@ class Bootstrap:
             cms: list[pl.DataFrame] = []
             for t in tqdm(set(thresholds or y_score)):
                 cm = (
-                    self.confusion_matrix(df["y_true"], df["threshold"].ge(t))
+                    self.confusion_matrix(
+                        df["y_true"], df["threshold"].ge(t), beta=beta
+                    )
                     .to_polars()
                     .with_columns(pl.lit(t).alias("threshold"))
                 )
@@ -577,7 +582,7 @@ class Bootstrap:
                 return (
                     pf.lazy()
                     .pipe(_base_confusion_matrix_at_thresholds)
-                    .pipe(_full_confusion_matrix_from_base)
+                    .pipe(_full_confusion_matrix_from_base, beta=beta)
                     .unique("threshold")
                     .pipe(_map_to_thresholds, thresholds)
                     .drop("_threshold_actual")
