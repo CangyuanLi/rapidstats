@@ -9,8 +9,8 @@ class MinMaxScaler:
         self._range_min, self._range_max = feature_range
         self._range_diff = self._range_max - self._range_min
 
-    def fit(self, X: nwt.IntoFrameT):
-        X = nw.from_native(X)
+    def fit(self, X: nwt.IntoDataFrameT):
+        X = nw.from_native(X, eager_only=True)
 
         self.feature_names_in_ = X.columns
         self.data_min_ = X.select(nws.all().min())
@@ -39,7 +39,7 @@ class MinMaxScaler:
         )
 
     @nw.narwhalify
-    def fit_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
         return self.fit(X).transform(X)
 
     @nw.narwhalify
@@ -58,3 +58,20 @@ class MinMaxScaler:
             nw.col(c).__sub__(self.min_[c]).__truediv__(self.scale_[c])
             for c in self.feature_names_in_
         )
+
+
+class OneHotEncoder:
+    def __init__(self):
+        pass
+
+    def fit(self, X: nwt.IntoDataFrameT):
+        pass
+
+    def transform(self):
+        pass
+
+    def fit_transforrm(self):
+        pass
+
+    def run(self):
+        pass

@@ -5,8 +5,8 @@ import pytest
 import scipy.stats
 import sklearn.metrics
 
-import rapidstats
-from rapidstats._metrics import ConfusionMatrix
+import rapidstats as rs
+from rapidstats.metrics import ConfusionMatrix
 
 SEED = 208
 N_ROWS = 1_000
@@ -124,7 +124,7 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
 @pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
 def test_confusion_matrix(y_true, y_pred):
     ref = reference_confusion_matrix(y_true, y_pred).__dict__
-    fs = rapidstats.confusion_matrix(y_true, y_pred).__dict__
+    fs = rs.metrics.confusion_matrix(y_true, y_pred).__dict__
 
     assert pytest.approx(list(fs.values()), nan_ok=True) == list(ref.values())
 
@@ -142,12 +142,12 @@ def test_bootstrap_f1(y_true, y_pred):
     rs_res = []
     ref_res = []
     for i in range(20):
-        rs = (
-            rapidstats.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED + i)
+        res = (
+            rs.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED + i)
             .confusion_matrix(y_true, y_pred)
             .fbeta
         )
-        rs_res.append((rs[0], rs[2]))
+        rs_res.append((res[0], res[2]))
 
         ref = scipy.stats.bootstrap(
             (y_true, y_pred),
@@ -177,7 +177,7 @@ def test_fbeta(y_true, y_pred):
             labels=[False, True],
             zero_division=np.nan,
         )
-        res = rapidstats.confusion_matrix(y_true, y_pred, beta=beta).fbeta
+        res = rs.metrics.confusion_matrix(y_true, y_pred, beta=beta).fbeta
 
         assert pytest.approx(ref, nan_ok=True) == res
 
@@ -192,7 +192,7 @@ def reference_roc_auc(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_roc_auc(y_true, y_score):
     ref = reference_roc_auc(y_true, y_score)
-    fs = rapidstats.roc_auc(y_true, y_score)
+    fs = rs.metrics.roc_auc(y_true, y_score)
 
     assert pytest.approx(fs, nan_ok=True) == ref
 
@@ -200,7 +200,7 @@ def test_roc_auc(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_average_precision(y_true, y_score):
     ref = sklearn.metrics.average_precision_score(y_true, y_score)
-    res = rapidstats.average_precision(y_true, y_score)
+    res = rs.metrics.average_precision(y_true, y_score)
 
     assert pytest.approx(ref) == res
 
@@ -218,7 +218,7 @@ def reference_max_ks(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_max_ks(y_true, y_score):
     ref = reference_max_ks(y_true, y_score)
-    fs = rapidstats.max_ks(y_true, y_score)
+    fs = rs.metrics.max_ks(y_true, y_score)
 
     assert pytest.approx(fs, nan_ok=True) == ref
 
@@ -226,7 +226,7 @@ def test_max_ks(y_true, y_score):
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
 def test_brier_loss(y_true, y_score):
     ref = sklearn.metrics.brier_score_loss(y_true, y_score)
-    res = rapidstats.brier_loss(y_true, y_score)
+    res = rs.metrics.brier_loss(y_true, y_score)
 
     assert pytest.approx(res) == ref
 
@@ -234,20 +234,20 @@ def test_brier_loss(y_true, y_score):
 @pytest.mark.parametrize("y_true", [Y_TRUE, Y_TRUE_SC])
 def test_mean(y_true):
     ref = y_true.mean()
-    res = rapidstats.mean(y_true)
+    res = rs.metrics.mean(y_true)
 
     assert pytest.approx(res) == ref
 
 
 def test_mean_squared_error():
-    res = rapidstats.mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
+    res = rs.metrics.mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
     ref = sklearn.metrics.mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
 
     assert pytest.approx(res) == ref
 
 
 def test_root_mean_squared_error():
-    res = rapidstats.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
+    res = rs.metrics.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
     ref = sklearn.metrics.root_mean_squared_error(Y_TRUE_REG, Y_SCORE_REG)
 
     assert pytest.approx(res) == ref
@@ -277,13 +277,13 @@ def test_confusion_matrix_at_thresholds(beta):
     )
 
     # loop
-    res = rapidstats.confusion_matrix_at_thresholds(
+    res = rs.metrics.confusion_matrix_at_thresholds(
         y_true, y_score, beta=beta, strategy="loop"
     ).sort("threshold", "metric")
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
     # cum_sum
-    res = rapidstats.confusion_matrix_at_thresholds(
+    res = rs.metrics.confusion_matrix_at_thresholds(
         y_true, y_score, beta=beta, strategy="cum_sum"
     ).sort("threshold", "metric")
     polars.testing.assert_series_equal(ref["value"], res["value"])
@@ -291,7 +291,7 @@ def test_confusion_matrix_at_thresholds(beta):
     # Specifying thresholds
     thresholds = THRESHOLDS
 
-    ref = rapidstats.confusion_matrix_at_thresholds(
+    ref = rs.metrics.confusion_matrix_at_thresholds(
         y_true,
         y_score,
         beta=beta,
@@ -299,7 +299,7 @@ def test_confusion_matrix_at_thresholds(beta):
         thresholds=thresholds,
     ).sort("threshold", "metric")
 
-    res = rapidstats.confusion_matrix_at_thresholds(
+    res = rs.metrics.confusion_matrix_at_thresholds(
         y_true,
         y_score,
         beta=beta,
@@ -315,7 +315,7 @@ def test_adverse_impact_ratio():
     control = [False] * 50 + [True] * 50
 
     assert (
-        pytest.approx(rapidstats.adverse_impact_ratio(y_pred, protected, control)) == 1
+        pytest.approx(rs.metrics.adverse_impact_ratio(y_pred, protected, control)) == 1
     )
 
 
@@ -325,10 +325,10 @@ def test_adverse_impact_ratio_at_thresholds():
     control = [False] * x + [True] * x
 
     # None
-    ref = rapidstats.adverse_impact_ratio_at_thresholds(
+    ref = rs.metrics.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, strategy="loop"
     ).sort("threshold")
-    res = rapidstats.adverse_impact_ratio_at_thresholds(
+    res = rs.metrics.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, strategy="cum_sum"
     ).sort("threshold")
 
@@ -336,10 +336,10 @@ def test_adverse_impact_ratio_at_thresholds():
 
     # Specifying thresholds
     thresholds = THRESHOLDS
-    ref = rapidstats.adverse_impact_ratio_at_thresholds(
+    ref = rs.metrics.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, thresholds=thresholds, strategy="loop"
     ).sort("threshold")
-    res = rapidstats.adverse_impact_ratio_at_thresholds(
+    res = rs.metrics.adverse_impact_ratio_at_thresholds(
         Y_SCORE, protected, control, thresholds=thresholds, strategy="cum_sum"
     ).sort("threshold")
 
@@ -347,8 +347,8 @@ def test_adverse_impact_ratio_at_thresholds():
 
 
 def test_predicted_positive_ratio_at_thresholds():
-    ref = rapidstats.predicted_positive_ratio_at_thresholds(Y_SCORE).sort("threshold")
-    res = rapidstats.predicted_positive_ratio_at_thresholds(
+    ref = rs.metrics.predicted_positive_ratio_at_thresholds(Y_SCORE).sort("threshold")
+    res = rs.metrics.predicted_positive_ratio_at_thresholds(
         Y_SCORE, strategy="cum_sum"
     ).sort("threshold")
 
@@ -357,6 +357,6 @@ def test_predicted_positive_ratio_at_thresholds():
 
 def test_r2():
     ref = sklearn.metrics.r2_score(Y_TRUE_REG, Y_SCORE_REG)
-    res = rapidstats.r2(Y_TRUE_REG, Y_SCORE_REG)
+    res = rs.metrics.r2(Y_TRUE_REG, Y_SCORE_REG)
 
     assert pytest.approx(res) == ref

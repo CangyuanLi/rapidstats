@@ -12,19 +12,6 @@ from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
 from ._distributions import norm
-from ._metrics import (
-    ConfusionMatrixMetric,
-    DefaultConfusionMatrixMetrics,
-    LoopStrategy,
-    PolarsFrame,
-    _air_at_thresholds_core,
-    _ap_from_pr_curve,
-    _base_confusion_matrix_at_thresholds,
-    _full_confusion_matrix_from_base,
-    _map_to_thresholds,
-    _set_loop_strategy,
-)
-from ._metrics import average_precision as _ap
 from ._rustystats import (
     _basic_interval,
     _bca_interval,
@@ -48,6 +35,19 @@ from ._utils import (
     _y_true_y_pred_to_df,
     _y_true_y_score_to_df,
 )
+from .metrics import (
+    ConfusionMatrixMetric,
+    DefaultConfusionMatrixMetrics,
+    LoopStrategy,
+    PolarsFrame,
+    _air_at_thresholds_core,
+    _ap_from_pr_curve,
+    _base_confusion_matrix_at_thresholds,
+    _full_confusion_matrix_from_base,
+    _map_to_thresholds,
+    _set_loop_strategy,
+)
+from .metrics import average_precision as _ap
 
 ConfidenceInterval = tuple[float, float, float]
 StatFunc = Callable[[pl.DataFrame], float]
