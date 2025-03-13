@@ -2,7 +2,6 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 import polars.testing
-import pytest
 import sklearn.preprocessing
 
 import rapidstats
