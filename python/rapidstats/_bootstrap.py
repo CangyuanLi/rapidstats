@@ -57,7 +57,7 @@ StatFunc = Callable[[pl.DataFrame], float]
 class BootstrappedConfusionMatrix:
     """Result object returned by `rapidstats.Bootstrap().confusion_matrix`.
 
-    See [rapidstats._metrics.ConfusionMatrix][] for a detailed breakdown of the attributes stored in
+    See [rapidstats.metrics.ConfusionMatrix][] for a detailed breakdown of the attributes stored in
     this class. However, instead of storing the statistic, it stores the bootstrapped
     confidence interval as (lower, mean, upper).
     """
@@ -492,7 +492,7 @@ class Bootstrap:
         y_pred: ArrayLike,
         beta: float = 1.0,
     ) -> BootstrappedConfusionMatrix:
-        """Bootstrap confusion matrix. See [rapidstats.confusion_matrix][] for
+        """Bootstrap confusion matrix. See [rapidstats.metrics.confusion_matrix][] for
         more details.
 
         Parameters
@@ -671,7 +671,7 @@ class Bootstrap:
         y_true: ArrayLike,
         y_score: ArrayLike,
     ) -> ConfidenceInterval:
-        """Bootstrap ROC-AUC. See [rapidstats.roc_auc][] for more details.
+        """Bootstrap ROC-AUC. See [rapidstats.metrics.roc_auc][] for more details.
 
         Parameters
         ----------
@@ -694,7 +694,7 @@ class Bootstrap:
     def average_precision(
         self, y_true: ArrayLike, y_score: ArrayLike
     ) -> ConfidenceInterval:
-        """Bootstrap average precision. See [rapidstats.average_precision][] for more
+        """Bootstrap average precision. See [rapidstats.metrics.average_precision][] for more
         details.
 
         Parameters
@@ -790,7 +790,7 @@ class Bootstrap:
             )
 
     def max_ks(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
-        """Bootstrap Max-KS. See [rapidstats.max_ks][] for more details.
+        """Bootstrap Max-KS. See [rapidstats.metrics.max_ks][] for more details.
 
         Parameters
         ----------
@@ -809,7 +809,7 @@ class Bootstrap:
         return _bootstrap_max_ks(df, **self._params)
 
     def brier_loss(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
-        """Bootstrap Brier loss. See [rapidstats.brier_loss][] for more details.
+        """Bootstrap Brier loss. See [rapidstats.metrics.brier_loss][] for more details.
 
         Parameters
         ----------
@@ -847,7 +847,7 @@ class Bootstrap:
     def adverse_impact_ratio(
         self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
     ) -> ConfidenceInterval:
-        """Bootstrap AIR. See [rapidstats.adverse_impact_ratio][] for more details.
+        """Bootstrap AIR. See [rapidstats.metrics.adverse_impact_ratio][] for more details.
 
         Parameters
         ----------
@@ -878,7 +878,7 @@ class Bootstrap:
         strategy: LoopStrategy = "auto",
     ) -> pl.DataFrame:
         """Bootstrap AIR at thresholds. See
-        [rapidstats.adverse_impact_ratio_at_thresholds][] for more details.
+        [rapidstats.metrics.adverse_impact_ratio_at_thresholds][] for more details.
 
         Parameters
         ----------
@@ -1007,7 +1007,7 @@ class Bootstrap:
     def mean_squared_error(
         self, y_true: ArrayLike, y_score: ArrayLike
     ) -> ConfidenceInterval:
-        r"""Bootstrap MSE. See [rapidstats.mean_squared_error][] for more details.
+        r"""Bootstrap MSE. See [rapidstats.metrics.mean_squared_error][] for more details.
 
         Parameters
         ----------
@@ -1028,7 +1028,7 @@ class Bootstrap:
     def root_mean_squared_error(
         self, y_true: ArrayLike, y_score: ArrayLike
     ) -> ConfidenceInterval:
-        r"""Bootstrap RMSE. See [rapidstats.root_mean_squared_error][] for more details.
+        r"""Bootstrap RMSE. See [rapidstats.metrics.root_mean_squared_error][] for more details.
 
         Parameters
         ----------
@@ -1047,7 +1047,7 @@ class Bootstrap:
         )
 
     def r2(self, y_true: ArrayLike, y_score: ArrayLike) -> ConfidenceInterval:
-        """Bootstrap R2. See [rapidstats.r2][] for more details.
+        """Bootstrap R2. See [rapidstats.metrics.r2][] for more details.
 
         Parameters
         ----------
