@@ -10,6 +10,8 @@ nav:
 - Correlation: correlation.md
 - Distributions: distributions.md
 - Metrics: metrics.md
+- Polars: polars.md
+- Preprocessing: preprocessing.md
 
 theme:
   name: material
