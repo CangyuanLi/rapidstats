@@ -74,7 +74,7 @@ def correlation_matrix(
     pl.DataFrame
         A correlation matrix with `l1` as the columns and `l2` as the rows
 
-    Added in version 0.0.26
+    Added in version 0.0.24
     -----------------------
     """
     # pl.corr works with nulls but NOT NaNs

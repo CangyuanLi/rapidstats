@@ -23,7 +23,7 @@ class norm:
             Likelihood a random variable is realized in the range at or below `q` for
             the normal distribution.
 
-        Added in version 0.0.26
+        Added in version 0.0.24
         -----------------------
         """
         return _norm_ppf(q)
@@ -41,7 +41,7 @@ class norm:
         float
             The probability a random variable will take a value \( \leq x \)
 
-        Added in version 0.0.26
+        Added in version 0.0.24
         -----------------------
         """
         return _norm_cdf(x)
