@@ -4,12 +4,41 @@ import narwhals.typing as nwt
 
 
 class MinMaxScaler:
+    """Scale data using min-max scaling.
+
+    Parameters
+    ----------
+    feature_range : tuple[float, float], optional
+        The range to scale the data to, by default (0, 1)
+    """
+
     def __init__(self, feature_range: tuple[float, float] = (0, 1)):
         self._feature_range = feature_range
         self._range_min, self._range_max = feature_range
         self._range_diff = self._range_max - self._range_min
 
     def fit(self, X: nwt.IntoDataFrameT):
+        """_summary_
+
+        Parameters
+        ----------
+        X : nwt.IntoDataFrameT
+            _description_
+
+        Sets
+        ----
+        data_min_ : nwt.DataFrameT
+        data_max_ : nwt.DataFrameT
+        data_range_ : nwt.DataFrameT
+        feature_names_in : list[str]
+        min_: nwt.DataFrameT
+        scale_ : nwt.DataFrameT
+
+        Returns
+        -------
+        self
+            Fitted MinMaxScaler
+        """
         X = nw.from_native(X, eager_only=True)
 
         self.feature_names_in_ = X.columns
@@ -61,6 +90,8 @@ class MinMaxScaler:
 
 
 class OneHotEncoder:
+    """One-hot encodes data."""
+
     def __init__(self):
         pass
 

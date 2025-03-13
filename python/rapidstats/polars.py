@@ -23,6 +23,27 @@ def auc(
     y: IntoExpr,
     method: Literal["rectangular", "trapezoidal"] = "trapezoidal",
 ) -> pl.Expr:
+    """Computes the area under the curve (AUC) via numerical integration.
+
+    Parameters
+    ----------
+    x : IntoExpr
+        The x-axis
+    y : IntoExpr
+        The y-axis
+    method : Literal["rectangular", "trapezoidal"], optional
+        If "rectangular", use rectangular integration, if "trapezoidal", use
+        trapezoidal integration, by default "trapezoidal"
+
+    Returns
+    -------
+    pl.Expr
+
+    Raises
+    ------
+    ValueError
+        If `method` is not one of `rectangular` or `trapezoidal`
+    """
     if method == "trapezoidal":
         is_trapezoidal = True
     elif method == "rectangular":
@@ -49,6 +70,23 @@ def is_close(
     atol: float = 1e-08,
     null_equal: bool = False,
 ) -> pl.Expr:
+    """Compares the relative equality of the inputs.
+
+    Parameters
+    ----------
+    x : IntoExpr
+    y : IntoExpr
+    rtol : float, optional
+        Relative tolerance, by default 1e-05
+    atol : float, optional
+        Absolute tolerance, by default 1e-08
+    null_equal : bool, optional
+        If True, considers nulls to be equal, by default False
+
+    Returns
+    -------
+    pl.Expr
+    """
     x = _into_expr(x)
     y = _into_expr(y)
 
