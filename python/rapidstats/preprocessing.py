@@ -6,13 +6,13 @@ import narwhals.typing as nwt
 class MinMaxScaler:
     """Scale data using min-max scaling.
 
-    Added in version 0.1.0
-    ----------------------
-
     Parameters
     ----------
     feature_range : tuple[float, float], optional
         The range to scale the data to, by default (0, 1)
+
+    Added in version 0.1.0
+    ----------------------
     """
 
     def __init__(self, feature_range: tuple[float, float] = (0, 1)):
