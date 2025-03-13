@@ -492,7 +492,7 @@ class Bootstrap:
         y_pred: ArrayLike,
         beta: float = 1.0,
     ) -> BootstrappedConfusionMatrix:
-        """Bootstrap confusion matrix. See [rapidstats.metrics.confusion_matrix][] for
+        r"""Bootstrap confusion matrix. See [rapidstats.metrics.confusion_matrix][] for
         more details.
 
         Parameters
@@ -501,6 +501,8 @@ class Bootstrap:
             Ground truth target
         y_pred : ArrayLike
             Predicted target
+        beta : float, optional
+            \( \beta \) to use in \( F_\beta \), by default 1
 
         Returns
         -------

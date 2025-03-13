@@ -175,7 +175,7 @@ class ConfusionMatrix:
 def confusion_matrix(
     y_true: ArrayLike, y_pred: ArrayLike, beta: float = 1.0
 ) -> ConfusionMatrix:
-    """Computes confusion matrix metrics (TP, FP, TN, FN, TPR, Fbeta, etc.).
+    r"""Computes confusion matrix metrics (TP, FP, TN, FN, TPR, Fbeta, etc.).
 
     Parameters
     ----------
@@ -183,6 +183,9 @@ def confusion_matrix(
         Ground truth target
     y_pred : ArrayLike
         Predicted target
+    beta : float, optional
+        \( \beta \) to use in \( F_\beta \), by default 1
+
 
     Returns
     -------
@@ -701,7 +704,7 @@ def confusion_matrix_at_thresholds(
     strategy: LoopStrategy = "auto",
     beta: float = 1.0,
 ) -> pl.DataFrame:
-    """Computes the confusion matrix at each threshold. When the `strategy` is
+    r"""Computes the confusion matrix at each threshold. When the `strategy` is
     "cum_sum", computes
 
     ``` py
@@ -725,6 +728,8 @@ def confusion_matrix_at_thresholds(
         The metrics to compute, by default DefaultConfusionMatrixMetrics
     strategy : LoopStrategy, optional
         Computation method, by default "auto"
+    beta : float, optional
+        \( \beta \) to use in \( F_\beta \), by default 1
 
     Returns
     -------
