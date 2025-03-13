@@ -109,7 +109,7 @@ class ConfusionMatrix:
     balanced_accuracy : float
         ↑Balanced Accuracy (BA); \( \frac{TP + TN}{2} \)
     fbeta : float
-        ↑\( F_{\beta} \); Harmonic mean of Precision and Recall; \( \frac{(1 + \beta)^2 \times PPV \times TPR}{(\beta^2 * PPV) + TPR} \)
+        ↑\( F_{\beta} \); Harmonic mean of Precision and Recall; \( \frac{(1 + \beta)^2 \times PPV \times TPR}{(\beta^2 \times PPV) + TPR} \)
     folkes_mallows_index : float
         ↑Folkes Mallows Index (FM); \( \sqrt{PPV \times TPR} \)
     mcc : float
