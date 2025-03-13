@@ -913,10 +913,12 @@ class Bootstrap:
         if strategy == "loop":
             airs: list[dict[str, float]] = []
             for t in tqdm(set(thresholds or y_score)):
-                l, m, u = self.adverse_impact_ratio(
+                lower, mean, upper = self.adverse_impact_ratio(
                     df["y_score"].lt(t), df["protected"], df["control"]
                 )
-                airs.append({"threshold": t, "lower": l, "mean": m, "upper": u})
+                airs.append(
+                    {"threshold": t, "lower": lower, "mean": mean, "upper": upper}
+                )
 
             return pl.DataFrame(airs).fill_nan(None).pipe(_fill_infinite, None)
 
