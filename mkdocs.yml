@@ -12,6 +12,7 @@ nav:
 - Metrics: metrics.md
 - Polars: polars.md
 - Preprocessing: preprocessing.md
+- Miscellaneous: misc.md
 
 theme:
   name: material

@@ -11,7 +11,33 @@ def auc(
     y: ArrayLike,
     method: Literal["rectangular", "trapezoidal"] = "trapezoidal",
     sorted: bool = False,
-):
+) -> float:
+    """Computes the Area Under the Curve (AUC) via numerical integration.
+
+    Parameters
+    ----------
+    x : ArrayLike
+        x points
+    y : ArrayLike
+        y points
+    method : Literal["rectangular", "trapezoidal"], optional
+        Integration method, by default "trapezoidal"
+    sorted : bool, optional
+        If True, assumes arrays are already sorted by `x`, by default False
+
+    Returns
+    -------
+    float
+        The AUC
+
+    Raises
+    ------
+    ValueError
+        If `method` is not one of `rectangular` or `trapezoidal`
+
+    Added in version 0.1.0
+    ----------------------
+    """
     df = pl.DataFrame({"x": x, "y": y}).drop_nulls().cast(pl.Float64)
 
     if not sorted:

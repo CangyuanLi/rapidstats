@@ -186,11 +186,13 @@ def confusion_matrix(
     beta : float, optional
         \( \beta \) to use in \( F_\beta \), by default 1
 
-
     Returns
     -------
     ConfusionMatrix
         Dataclass of confusion matrix metrics
+
+    Added in version 0.1.0
+    ----------------------
     """
     df = _y_true_y_pred_to_df(y_true, y_pred)
 
@@ -211,6 +213,9 @@ def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         ROC-AUC
+
+    Added in version 0.1.0
+    ----------------------
     """
     df = _y_true_y_score_to_df(y_true, y_score).with_columns(
         pl.col("y_true").cast(pl.Float64)
@@ -244,6 +249,9 @@ def max_ks(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         Max-KS
+
+    Added in version 0.1.0
+    ----------------------
     """
     df = _y_true_y_score_to_df(y_true, y_score)
 
@@ -270,6 +278,9 @@ def brier_loss(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         Brier loss
+
+    Added in version 0.1.0
+    ----------------------
     """
     df = _y_true_y_score_to_df(y_true, y_score)
 
@@ -288,6 +299,9 @@ def mean(y: ArrayLike) -> float:
     -------
     float
         Mean
+
+    Added in version 0.1.0
+    ----------------------
     """
     return _mean(pl.DataFrame({"y": y}))
 
@@ -315,6 +329,9 @@ def predicted_positive_ratio_at_thresholds(
     -------
     pl.DataFrame
         A DataFrame of `threshold` and `ppr`
+
+    Added in version 0.1.0
+    ----------------------
     """
     strategy = _set_loop_strategy(y_score, strategy)
 
@@ -367,6 +384,9 @@ def adverse_impact_ratio(
     -------
     float
         Adverse Impact Ratio (AIR)
+
+    Added in version 0.1.0
+    ----------------------
     """
     return _adverse_impact_ratio(
         pl.DataFrame(
@@ -470,6 +490,9 @@ def adverse_impact_ratio_at_thresholds(
     -------
     pl.DataFrame
         A DataFrame of `threshold` and `air`
+
+    Added in version 0.1.0
+    ----------------------
     """
     df = pl.DataFrame(
         {"y_score": y_score, "protected": protected, "control": control}
@@ -516,6 +539,9 @@ def mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         Mean Squared Error (MSE)
+
+    Added in version 0.1.0
+    ----------------------
     """
     return _mean_squared_error(_regression_to_df(y_true, y_score))
 
@@ -538,6 +564,9 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         Root Mean Squared Error (RMSE)
+
+    Added in version 0.1.0
+    ----------------------
     """
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
 
@@ -735,6 +764,9 @@ def confusion_matrix_at_thresholds(
     -------
     pl.DataFrame
         A Polars DataFrame of `threshold`, `metric`, and `value`
+
+    Added in version 0.1.0
+    ----------------------
     """
     strategy = _set_loop_strategy(thresholds, strategy)
 
@@ -792,6 +824,9 @@ def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         Average Precision (AP)
+
+    Added in version 0.1.0
+    ----------------------
     """
     return (
         pl.LazyFrame({"y_true": y_true, "threshold": y_score})
@@ -857,5 +892,8 @@ def r2(y_true: ArrayLike, y_score: ArrayLike) -> float:
     -------
     float
         R2
+
+    Added in version 0.1.0
+    ----------------------
     """
     return _r2(_regression_to_df(y_true, y_score))

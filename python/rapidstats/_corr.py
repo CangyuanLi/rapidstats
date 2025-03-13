@@ -18,7 +18,7 @@ def _corr_expr(c1, c2, method: CorrelationMethod) -> pl.Expr:
 
 
 def _to_polars(
-    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
+    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
 ) -> Union[pl.LazyFrame, pl.DataFrame]:
     if isinstance(data, pl.DataFrame):
         return data
@@ -73,6 +73,9 @@ def correlation_matrix(
     -------
     pl.DataFrame
         A correlation matrix with `l1` as the columns and `l2` as the rows
+
+    Added in version 0.0.26
+    -----------------------
     """
     # pl.corr works with nulls but NOT NaNs
     pf = _to_polars(data).select(cs.numeric() | cs.boolean()).fill_nan(None)

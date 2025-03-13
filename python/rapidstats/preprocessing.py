@@ -6,6 +6,9 @@ import narwhals.typing as nwt
 class MinMaxScaler:
     """Scale data using min-max scaling.
 
+    Added in version 0.1.0
+    ----------------------
+
     Parameters
     ----------
     feature_range : tuple[float, float], optional
@@ -25,8 +28,8 @@ class MinMaxScaler:
         X : nwt.IntoDataFrameT
             _description_
 
-        Sets
-        ----
+        Attributes
+        ----------
         data_min_ : nwt.DataFrameT
         data_max_ : nwt.DataFrameT
         data_range_ : nwt.DataFrameT
@@ -90,7 +93,11 @@ class MinMaxScaler:
 
 
 class OneHotEncoder:
-    """One-hot encodes data."""
+    """One-hot encodes data.
+
+    Added in version 0.1.0
+    ----------------------
+    """
 
     def __init__(self):
         pass

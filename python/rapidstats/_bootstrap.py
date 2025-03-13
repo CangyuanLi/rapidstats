@@ -447,6 +447,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, higher)
+
+        Added in version 0.1.0
+        ----------------------
         """
         default = {"executor": "threads", "preserve_order": False}
         for k, v in default.items():
@@ -509,6 +512,9 @@ class Bootstrap:
         BootstrappedConfusionMatrix
             A dataclass of confusion matrix metrics as (lower, mean, upper). See
             [rapidstats._bootstrap.BootstrappedConfusionMatrix][] for more details.
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = _y_true_y_pred_to_df(y_true, y_pred)
 
@@ -553,6 +559,9 @@ class Bootstrap:
         ------
         NotImplementedError
             When `strategy` is `cum_sum` and `method` is `BCa`
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
@@ -691,6 +700,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = _y_true_y_score_to_df(y_true, y_score).with_columns(
             pl.col("y_true").cast(pl.Float64)
@@ -715,6 +727,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = (
             _y_true_y_score_to_df(y_true, y_score)
@@ -810,6 +825,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
@@ -846,6 +864,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = pl.DataFrame({"y": y})
 
@@ -869,6 +890,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         df = pl.DataFrame(
             {"y_pred": y_pred, "protected": protected, "control": control}
@@ -1027,6 +1051,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         return _bootstrap_mean_squared_error(
             _regression_to_df(y_true, y_score), **self._params
@@ -1048,6 +1075,9 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         return _bootstrap_root_mean_squared_error(
             _regression_to_df(y_true, y_score), **self._params
@@ -1067,5 +1097,8 @@ class Bootstrap:
         -------
         ConfidenceInterval
             A tuple of (lower, mean, upper)
+
+        Added in version 0.1.0
+        ----------------------
         """
         return _bootstrap_r2(_regression_to_df(y_true, y_score), **self._params)
