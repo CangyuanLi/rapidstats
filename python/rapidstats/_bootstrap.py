@@ -526,7 +526,7 @@ class Bootstrap:
         beta: float = 1.0,
     ) -> pl.DataFrame:
         r"""Bootstrap confusion matrix at thresholds. See
-        [rapidstats.confusion_matrix_at_thresholds][] for more details.
+        [rapidstats.metrics.confusion_matrix_at_thresholds][] for more details.
 
         Parameters
         ----------

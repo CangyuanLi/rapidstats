@@ -64,7 +64,7 @@ LoopStrategy = Literal["auto", "loop", "cum_sum"]
 
 @dataclasses.dataclass
 class ConfusionMatrix:
-    r"""Result object returned by `rapidstats.confusion_matrix`
+    r"""Result object returned by `rapidstats.metrics.confusion_matrix`
 
     Attributes
     ----------
@@ -442,7 +442,7 @@ def adverse_impact_ratio_at_thresholds(
     strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
     """Computes the Adverse Impact Ratio (AIR) at each threshold of `y_score`. See
-    [rapidstats.adverse_impact_ratio][] for more details. When the `strategy` is
+    [rapidstats.metrics.adverse_impact_ratio][] for more details. When the `strategy` is
     `cum_sum`, computes
 
 
@@ -779,6 +779,20 @@ def _ap_from_pr_curve(precision: pl.Expr, recall: pl.Expr) -> pl.Expr:
 
 
 def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
+    """Computes Average Precision.
+
+    Parameters
+    ----------
+    y_true : ArrayLike
+        Ground truth target
+    y_score : ArrayLike
+        Predicted scores
+
+    Returns
+    -------
+    float
+        Average Precision (AP)
+    """
     return (
         pl.LazyFrame({"y_true": y_true, "threshold": y_score})
         .with_columns(pl.col("y_true").cast(pl.Boolean))
