@@ -1,1 +1,1 @@
-::: rapidstats._metrics
+::: rapidstats.metrics
