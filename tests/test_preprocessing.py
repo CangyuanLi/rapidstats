@@ -59,12 +59,12 @@ def test_one_hot_encoder():
             pl.Series("x_a", [True, None, False]),
             pl.Series("x_b", [False, None, True]),
         ),
-        df1.pipe(encoder.transform),
+        df1.pipe(encoder.transform).select("x", "x_a", "x_b"),
     )
 
     polars.testing.assert_frame_equal(
         df2.with_columns(
             pl.Series("x_a", [True, None, True]), pl.Series("x_b", [False, None, False])
         ),
-        df2.pipe(encoder.transform),
+        df2.pipe(encoder.transform).select("x", "x_a", "x_b"),
     )
