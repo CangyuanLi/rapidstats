@@ -12,6 +12,10 @@ mod distributions;
 mod general;
 mod metrics;
 
+use pyo3_polars::PolarsAllocator;
+#[global_allocator]
+static ALLOC: PolarsAllocator = PolarsAllocator::new();
+
 macro_rules! generate_functions {
     ($func_name:ident, $metric_func:path) => {
         #[pyfunction]
