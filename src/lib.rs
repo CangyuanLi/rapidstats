@@ -21,6 +21,7 @@ macro_rules! generate_functions {
 
         paste! {
             #[pyfunction]
+            #[pyo3(signature = (df, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None))]
             fn [<_bootstrap $func_name>] (
                 df: PyDataFrame,
                 iterations: u64,
@@ -70,6 +71,7 @@ fn _confusion_matrix(df: PyDataFrame, beta: f64) -> PyResult<metrics::ConfusionM
 }
 
 #[pyfunction]
+#[pyo3(signature = (df, beta, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None))]
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
     beta: f64,

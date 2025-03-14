@@ -247,12 +247,14 @@ pub fn brier_loss(df: DataFrame) -> f64 {
         .unwrap()
         .column("x")
         .unwrap()
+        .f64()
+        .unwrap()
         .mean()
         .unwrap_or(f64::NAN)
 }
 
 pub fn mean(df: DataFrame) -> f64 {
-    df["y"].mean().unwrap_or(f64::NAN)
+    df["y"].as_series().unwrap().mean().unwrap_or(f64::NAN)
 }
 
 pub fn adverse_impact_ratio(df: DataFrame) -> f64 {

@@ -5,18 +5,30 @@ edition = "2021"
 
 [lib]
 name = "rapidstats"
-crate-type = [ "cdylib",]
+crate-type = ["cdylib"]
 
 [dependencies]
 ndarray = "0.15.6"
 paste = "1.0.15"
-pyo3 = "0.21.0"
+polars-arrow = "0.46.0"
+pyo3 = "0.23.0"
 rayon = "1.10.0"
 
+[dependencies.hashbrown]
+version = "0.15"
+features = ["nightly"]
+
 [dependencies.pyo3-polars]
-version = "0.14.0"
-features = [ "derive",]
+version = "0.20.0"
+features = ["derive"]
 
 [dependencies.polars]
-version = "0.40.0"
-features = [ "performant", "random", "lazy", "cum_agg", "unique_counts",]
+version = "0.46.0"
+features = [
+    "performant",
+    "random",
+    "lazy",
+    "cum_agg",
+    "unique_counts",
+    "nightly",
+]

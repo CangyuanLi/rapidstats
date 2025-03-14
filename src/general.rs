@@ -43,5 +43,5 @@ fn pl_auc(inputs: &[Series]) -> PolarsResult<Series> {
         rectangular_auc(x, y)
     };
 
-    Ok(Series::from_vec("auc", vec![res]))
+    Ok(Series::from_vec("auc".into(), vec![res]))
 }

@@ -187,7 +187,7 @@ where
     F: Fn(DataFrame) -> T + Send + Sync,
 {
     let df_height = df.height();
-    let index = ChunkedArray::new("index", 0..df_height as u64);
+    let index = ChunkedArray::new("index".into(), 0..df_height as u64);
     let jacknife_stats: Vec<T> = (0..df_height)
         .into_par_iter()
         .map(|i| func(df.filter(&index.not_equal(i)).unwrap()))
