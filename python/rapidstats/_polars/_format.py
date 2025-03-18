@@ -1,11 +1,10 @@
 import dataclasses
 import enum
-from pathlib import Path
 from typing import Union
 
 import polars as pl
 
-from ._utils import _PLUGIN_PATH
+from ._utils import _PLUGIN_PATH, IntoExpr
 
 
 class _Enum:
@@ -168,10 +167,13 @@ def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
     if format_spec.separator is not None:
         expr = expr.pipe(_format_strnum_with_sep, sep=format_spec.separator)
 
+    if format_spec.sign == Sign.ALL.value:
+        expr = pl.when(expr.str.head(1).ne("-")).then(pl.concat_str(pl.lit("+"), expr))
+
     return expr
 
 
-def format(f_string: str, *args) -> pl.Expr:
+def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
     parts = _parse_format_string(f_string)
     formatters = [
         _parse_formatter(p) for p, is_formatter in zip(*parts) if is_formatter
