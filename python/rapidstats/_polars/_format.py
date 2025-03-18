@@ -155,7 +155,7 @@ def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
     elif format_spec.type_ is None:
         pass
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(f"Type {format_spec.type_} not implemented")
 
     if format_spec.precision is not None:
         expr = expr.round(format_spec.precision).cast(pl.String)
@@ -181,6 +181,51 @@ def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
 
 
 def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
+    """Format expressions as a string using Python f-string syntax.
+
+    Parameters
+    ----------
+    f_string : str
+        A string with placeholders, mimicing Python f-string syntax. For example,
+        "{:.3f}". Currently, the only supported types are "f" and "%". Width, alignment,
+        and fill are also not supported.
+    args
+        Expression(s) that fill the placeholders
+
+    Returns
+    -------
+    pl.Expr
+
+    Raises
+    ------
+    ValueError
+        If the number of placeholders does not match the number of expressions
+
+    Examples
+    --------
+    ``` py
+    import polars as pl
+    import rapidstats as rs
+
+    df = pl.DataFrame({"x": 1123.09873, "y": "foo"})
+    df.select(
+        rs.polars.format(
+            "{:,.3f} is {} is {}", pl.col("x"), pl.col("y"), "bar"
+        )
+    )
+    ```
+    shape: (1, 1)
+    ┌─────────────────────────┐
+    │ x                       │
+    │ ---                     │
+    │ str                     │
+    ╞═════════════════════════╡
+    │ 1,123.099 is foo is bar │
+    └─────────────────────────┘
+
+    Added in version 0.2.0
+    ----------------------
+    """
     parts = _parse_format_string(f_string)
     formatters = [
         _parse_formatter(p) for p, is_formatter in zip(*parts) if is_formatter
