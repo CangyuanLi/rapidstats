@@ -214,6 +214,7 @@ def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
         )
     )
     ```
+    ``` title="output"
     shape: (1, 1)
     ┌─────────────────────────┐
     │ x                       │
@@ -222,6 +223,7 @@ def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
     ╞═════════════════════════╡
     │ 1,123.099 is foo is bar │
     └─────────────────────────┘
+    ```
 
     Added in version 0.2.0
     ----------------------
