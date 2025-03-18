@@ -144,10 +144,14 @@ def _format_strnum_with_sep(expr: pl.Expr, sep: str) -> pl.Expr:
 
 
 def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
+    add_percent = False
+
     if format_spec.type_ == Type.FIXED_POINT.value:
         expr = expr.cast(pl.Float64)
     elif format_spec.type_ == Type.PERCENTAGE.value:
         expr = expr.mul(100).cast(pl.Float64)
+
+        add_percent = True
     elif format_spec.type_ is None:
         pass
     else:
@@ -163,6 +167,9 @@ def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
         expr = pl.concat_str(int_part, pl.lit("."), decimal_part)
     else:
         expr = expr.cast(pl.String)
+
+    if add_percent:
+        expr = pl.concat_str(expr, pl.lit("%"))
 
     if format_spec.separator is not None:
         expr = expr.pipe(_format_strnum_with_sep, sep=format_spec.separator)
