@@ -1,8 +1,9 @@
 import numpy as np
 import polars as pl
+import polars.testing as plt
 import pytest
 
-import rapidstats
+import rapidstats as rs
 
 np.random.seed(208)
 
@@ -26,7 +27,7 @@ def test_auc(x, y):
     def rs_auc(x, y, method="trapezoidal"):
         df = pl.DataFrame({"x": x, "y": y})
 
-        return df.select(rapidstats.polars.auc("x", "y", method=method)).item()
+        return df.select(rs.polars.auc("x", "y", method=method)).item()
 
     ref_auc = reference_auc(x, y)
 
@@ -41,7 +42,7 @@ def test_auc(x, y):
 
     res = (
         df.group_by("idx")
-        .agg(rapidstats.polars.auc("x", "y", method="trapezoidal").alias("auc"))
+        .agg(rs.polars.auc("x", "y", method="trapezoidal").alias("auc"))
         .collect()["auc"]
         .to_list()
     )
@@ -62,11 +63,29 @@ def test_is_close():
             "correct_null_equal": [True, True, True, False, True],
         }
     ).with_columns(
-        rapidstats.polars.is_close("a", "b", null_equal=False).alias("is_close"),
-        rapidstats.polars.is_close("a", "b", null_equal=True).alias(
-            "is_close_null_equal"
-        ),
+        rs.polars.is_close("a", "b", null_equal=False).alias("is_close"),
+        rs.polars.is_close("a", "b", null_equal=True).alias("is_close_null_equal"),
     )
 
     assert df["correct"].eq(df["is_close"]).sum() == 4
     assert df["correct_null_equal"].eq(df["is_close_null_equal"]).sum() == 5
+
+
+def test_format():
+    x = 10_000_000
+    df = pl.DataFrame({"a": [100.05989, -0.99999], "b": [10000, 25]}).with_columns(
+        rs.polars.format(
+            "{:.5f} {{another}} {:+_.3%} some space {}",
+            pl.col("a"),
+            pl.col("b"),
+            x,
+        ).alias("formatted"),
+        pl.struct(a="a", b="b", x=pl.lit(x))
+        .map_elements(
+            lambda dct: f"{dct['a']:.5f} {{another}} {dct['b']:+_.3%} some space {dct['x']}",
+            return_dtype=pl.String,
+        )
+        .alias("formatted_correct"),
+    )
+
+    plt.assert_series_equal(df["formatted_correct"], df["formatted"], check_names=False)
