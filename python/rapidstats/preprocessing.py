@@ -18,7 +18,8 @@ def _read_list(path: PathLike) -> list:
 
 def _write_list(lst: list, path: PathLike):
     with open(path, "w") as f:
-        f.writelines(lst)
+        for x in lst:
+            f.write(f"{x}\n")
 
 
 class MinMaxScaler:
