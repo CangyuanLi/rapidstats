@@ -1,6 +1,24 @@
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import Union
+
 import narwhals as nw
 import narwhals.selectors as nws
 import narwhals.typing as nwt
+import polars as pl
+
+PathLike = Union[str, Path]
+
+
+def _read_list(path: PathLike) -> list:
+    with open(path) as f:
+        return [x.strip() for x in f.readlines()]
+
+
+def _write_list(lst: list, path: PathLike):
+    with open(path, "w") as f:
+        f.writelines(lst)
 
 
 class MinMaxScaler:
@@ -30,9 +48,6 @@ class MinMaxScaler:
 
         Attributes
         ----------
-        data_min_ : nwt.DataFrameT
-        data_max_ : nwt.DataFrameT
-        data_range_ : nwt.DataFrameT
         feature_names_in : list[str]
         min_: nwt.DataFrameT
         scale_ : nwt.DataFrameT
@@ -45,18 +60,18 @@ class MinMaxScaler:
         X = nw.from_native(X, eager_only=True)
 
         self.feature_names_in_ = X.columns
-        self.data_min_ = X.select(nws.all().min())
-        self.data_max_ = X.select(nws.all().max())
-        self.data_range_: nwt.DataFrameT = self.data_max_.select(
-            nw.col(c).__sub__(self.data_min_[c]) for c in self.feature_names_in_
+        data_min = X.select(nws.all().min())
+        data_max = X.select(nws.all().max())
+        data_range: nwt.DataFrameT = data_max.select(
+            nw.col(c).__sub__(data_min[c]) for c in self.feature_names_in_
         )
 
-        self.scale_ = self.data_range_.with_columns(
+        self.scale_ = data_range.with_columns(
             nw.lit(self._range_diff).__truediv__(nw.col(c)).alias(c)
             for c in self.feature_names_in_
         )
 
-        self.min_ = self.data_min_.select(
+        self.min_ = data_min.select(
             nw.lit(self._range_min).__sub__(nw.col(c).__mul__(self.scale_[c])).alias(c)
             for c in self.feature_names_in_
         )
@@ -90,6 +105,66 @@ class MinMaxScaler:
             nw.col(c).__sub__(self.min_[c]).__truediv__(self.scale_[c])
             for c in self.feature_names_in_
         )
+
+    def save(self, path: PathLike):
+        """_summary_
+
+        Parameters
+        ----------
+        path : PathLike
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+
+        Added in version 0.2.0
+        ----------------------
+        """
+        with zipfile.ZipFile(
+            path, "w"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            self.min_.write_parquet(tmpdir / "min_.parquet")
+            self.scale_.write_parquet(tmpdir / "scale_.parquet")
+            _write_list(self.feature_names_in_, tmpdir / "feature_names_in_.txt")
+
+            archive.write(tmpdir / "min_.parquet", "min_.parquet")
+            archive.write(tmpdir / "scale_.parquet", "scale_.parquet")
+            archive.write(tmpdir / "feature_names_in_.txt", "feature_names_in_.txt")
+
+        return self
+
+    def load(self, path: PathLike):
+        """_summary_
+
+        Parameters
+        ----------
+        path : PathLike
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+
+        Added in version 0.2.0
+        ----------------------
+        """
+        with zipfile.ZipFile(
+            path, "r"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            archive.extractall(tmpdir)
+
+            self.min_ = nw.read_parquet(f"{tmpdir}/min_.parquet", native_namespace=pl)
+            self.scale_ = nw.read_parquet(
+                f"{tmpdir}/scale_.parquet", native_namespace=pl
+            )
+            self.feature_names_in_ = _read_list(f"{tmpdir}/feature_names_in_.txt")
+
+        return self
 
 
 class OneHotEncoder:
