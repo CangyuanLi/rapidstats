@@ -196,3 +196,28 @@ class OneHotEncoder:
     @nw.narwhalify
     def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
         return self.fit(X).transform(X)
+
+    def save(self, path: PathLike):
+        with zipfile.ZipFile(
+            path, "w"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            for k, v in self.categories_.items():
+                v.to_frame().write_parquet(tmpdir / k)
+                archive.write(tmpdir / k, k)
+
+        return self
+
+    def load(self, path: PathLike):
+        with zipfile.ZipFile(
+            path, "r"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            archive.extractall(tmpdir)
+
+            self.categories_ = {
+                file: nw.read_parquet(f"{tmpdir}/{file}", native_namespace=pl)[file]
+                for file in archive.namelist()
+            }
+
+        return self

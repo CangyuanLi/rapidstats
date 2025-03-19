@@ -88,3 +88,15 @@ def test_one_hot_encoder():
         ),
         df2.pipe(encoder.transform).select("x", "x_a", "x_b"),
     )
+
+    # test save and load
+    with tempfile.TemporaryFile() as f:
+        encoder = rs.preprocessing.OneHotEncoder().fit(df1)
+        encoder.save(f)
+
+        encoder_loaded = rs.preprocessing.OneHotEncoder().load(f)
+
+        for k, v in encoder.categories_.items():
+            polars.testing.assert_series_equal(
+                v.to_polars(), encoder_loaded.categories_[k].to_polars()
+            )
