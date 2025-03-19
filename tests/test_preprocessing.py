@@ -6,7 +6,7 @@ import polars.selectors as cs
 import polars.testing
 import sklearn.preprocessing
 
-import rapidstats
+import rapidstats as rs
 
 SEED = 208
 
@@ -40,11 +40,11 @@ def test_min_max_scaler():
 
     np.testing.assert_allclose(
         sklearn.preprocessing.MinMaxScaler().fit_transform(DATA),
-        rapidstats.preprocessing.MinMaxScaler().fit_transform(DATA).to_numpy(),
+        rs.preprocessing.MinMaxScaler().fit_transform(DATA).to_numpy(),
     )
 
     # test inverse transform
-    scaler = rapidstats.preprocessing.MinMaxScaler()
+    scaler = rs.preprocessing.MinMaxScaler()
 
     polars.testing.assert_frame_equal(
         DATA, scaler.inverse_transform(scaler.fit_transform(DATA))
@@ -53,11 +53,11 @@ def test_min_max_scaler():
 
 def test_min_max_scaler_save():
     with tempfile.TemporaryFile() as f:
-        scaler = rapidstats.preprocessing.MinMaxScaler()
+        scaler = rs.preprocessing.MinMaxScaler()
         scaler.fit(DATA)
         scaler.save(f)
 
-        scaler_loaded = rapidstats.preprocessing.MinMaxScaler().load(f)
+        scaler_loaded = rs.preprocessing.MinMaxScaler().load(f)
 
         polars.testing.assert_frame_equal(
             scaler.min_.to_polars(), scaler_loaded.min_.to_polars()
@@ -72,7 +72,7 @@ def test_one_hot_encoder():
     df1 = pl.DataFrame({"x": ["a", None, "b"]})
     df2 = pl.DataFrame({"x": ["a", None, "a"]})
 
-    encoder = rapidstats.preprocessing.OneHotEncoder().fit(df1)
+    encoder = rs.preprocessing.OneHotEncoder().fit(df1)
 
     polars.testing.assert_frame_equal(
         df1.with_columns(
