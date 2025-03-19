@@ -1,7 +1,7 @@
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Union
+from typing import Self, Union
 
 import narwhals as nw
 import narwhals.selectors as nws
@@ -39,7 +39,7 @@ class MinMaxScaler:
         self._range_min, self._range_max = feature_range
         self._range_diff = self._range_max - self._range_min
 
-    def fit(self, X: nwt.IntoDataFrameT):
+    def fit(self, X: nwt.IntoDataFrameT) -> Self:
         """_summary_
 
         Parameters
@@ -107,7 +107,7 @@ class MinMaxScaler:
             for c in self.feature_names_in_
         )
 
-    def save(self, path: PathLike):
+    def save(self, path: PathLike) -> Self:
         """_summary_
 
         Parameters
@@ -138,7 +138,7 @@ class MinMaxScaler:
 
         return self
 
-    def load(self, path: PathLike):
+    def load(self, path: PathLike) -> Self:
         """_summary_
 
         Parameters
@@ -178,7 +178,7 @@ class OneHotEncoder:
     def __init__(self):
         pass
 
-    def fit(self, X: nwt.IntoDataFrameT):
+    def fit(self, X: nwt.IntoDataFrameT) -> Self:
         X = nw.from_native(X, eager_only=True)
 
         self.categories_ = {c: X[c].drop_nulls().unique() for c in X.columns}
@@ -197,7 +197,7 @@ class OneHotEncoder:
     def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
         return self.fit(X).transform(X)
 
-    def save(self, path: PathLike):
+    def save(self, path: PathLike) -> Self:
         with zipfile.ZipFile(
             path, "w"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -209,7 +209,7 @@ class OneHotEncoder:
 
         return self
 
-    def load(self, path: PathLike):
+    def load(self, path: PathLike) -> Self:
         with zipfile.ZipFile(
             path, "r"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
