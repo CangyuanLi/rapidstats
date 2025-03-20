@@ -210,6 +210,21 @@ class OneHotEncoder:
         return self
 
     def load(self, path: PathLike) -> Self:
+        """_summary_
+
+        Parameters
+        ----------
+        path : PathLike
+            _description_
+
+        Returns
+        -------
+        Self
+            _description_
+
+        Added in version 0.2.0
+        ----------------------
+        """
         with zipfile.ZipFile(
             path, "r"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
