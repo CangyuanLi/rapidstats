@@ -2,7 +2,7 @@ import json
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Self, Union
+from typing import Union
 
 import narwhals as nw
 import narwhals.selectors as nws
@@ -49,13 +49,13 @@ class MinMaxScaler:
         self.feature_range = feature_range
         self._set_range_vars()
 
-    def _set_range_vars(self) -> Self:
+    def _set_range_vars(self):
         self._range_min, self._range_max = self.feature_range
         self._range_diff = self._range_max - self._range_min
 
         return self
 
-    def fit(self, X: nwt.IntoDataFrameT) -> Self:
+    def fit(self, X: nwt.IntoDataFrameT):
         """_summary_
 
         Parameters
@@ -123,7 +123,7 @@ class MinMaxScaler:
             for c in self.feature_names_in_
         )
 
-    def save(self, path: PathLike) -> Self:
+    def save(self, path: PathLike):
         """_summary_
 
         Parameters
@@ -160,7 +160,7 @@ class MinMaxScaler:
 
         return self
 
-    def load(self, path: PathLike) -> Self:
+    def load(self, path: PathLike):
         """_summary_
 
         Parameters
@@ -210,7 +210,7 @@ class StandardScaler:
         self.ddof = ddof
 
     @nw.narwhalify
-    def fit(self, X: nwt.IntoDataFrame) -> Self:
+    def fit(self, X: nwt.IntoDataFrame):
         self.mean_ = X.select(nws.all().mean())
         self.std_ = X.select(nws.all().std(ddof=self.ddof))
         self.feature_names_in_ = X.columns
@@ -243,7 +243,7 @@ class StandardScaler:
             .__truediv__(nws.all().std(ddof=self.ddof))
         )
 
-    def save(self, path: PathLike) -> Self:
+    def save(self, path: PathLike):
         with zipfile.ZipFile(
             path, "w"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -265,7 +265,7 @@ class StandardScaler:
 
         return self
 
-    def load(self, path: PathLike) -> Self:
+    def load(self, path: PathLike):
         with zipfile.ZipFile(
             path, "r"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -285,7 +285,7 @@ class RobustScaler:
         self.quantile_range = quantile_range
 
     @nw.narwhalify
-    def fit(self, X: nwt.IntoDataFrame) -> Self:
+    def fit(self, X: nwt.IntoDataFrame):
         self.feature_names_in_ = X.columns
         self.median_ = X.select(nws.all().median())
         self.scale_ = X.select(
@@ -328,7 +328,7 @@ class RobustScaler:
             )
         )
 
-    def save(self, path: PathLike) -> Self:
+    def save(self, path: PathLike):
         with zipfile.ZipFile(
             path, "w"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -350,7 +350,7 @@ class RobustScaler:
 
         return self
 
-    def load(self, path: PathLike) -> Self:
+    def load(self, path: PathLike):
         with zipfile.ZipFile(
             path, "r"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -379,7 +379,7 @@ class OneHotEncoder:
     def __init__(self):
         pass
 
-    def fit(self, X: nwt.IntoDataFrameT) -> Self:
+    def fit(self, X: nwt.IntoDataFrameT):
         X = nw.from_native(X, eager_only=True)
 
         self.categories_ = {c: X[c].drop_nulls().unique() for c in X.columns}
@@ -398,7 +398,7 @@ class OneHotEncoder:
     def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
         return self.fit(X).transform(X)
 
-    def save(self, path: PathLike) -> Self:
+    def save(self, path: PathLike):
         with zipfile.ZipFile(
             path, "w"
         ) as archive, tempfile.TemporaryDirectory() as tmpdir:
@@ -410,7 +410,7 @@ class OneHotEncoder:
 
         return self
 
-    def load(self, path: PathLike) -> Self:
+    def load(self, path: PathLike):
         """_summary_
 
         Parameters
