@@ -59,7 +59,7 @@ def test_min_max_scaler():
 
 def test_min_max_scaler_save():
     with tempfile.TemporaryFile() as f:
-        scaler = rs.preprocessing.MinMaxScaler()
+        scaler = rs.preprocessing.MinMaxScaler(feature_range=(1, 2))
         scaler.fit(DATA)
         scaler.save(f)
 
@@ -77,6 +77,8 @@ def test_min_max_scaler_save():
         polars.testing.assert_frame_equal(
             scaler.transform(DATA), scaler_loaded.transform(DATA)
         )
+
+        polars.testing.assert_frame_equal(scaler.run(DATA), scaler_loaded.run(DATA))
 
 
 def test_standard_scaler():
@@ -105,7 +107,7 @@ def test_standard_scaler():
 
     # test save and load
     with tempfile.TemporaryFile() as f:
-        scaler = rs.preprocessing.StandardScaler()
+        scaler = rs.preprocessing.StandardScaler(ddof=10)
         scaler.fit(data)
         scaler.save(f)
 
@@ -119,6 +121,12 @@ def test_standard_scaler():
         )
         assert scaler.feature_names_in_ == scaler_loaded.feature_names_in_
         assert scaler.ddof == scaler_loaded.ddof
+
+        polars.testing.assert_frame_equal(
+            scaler.transform(data), scaler_loaded.transform(data)
+        )
+
+        polars.testing.assert_frame_equal(scaler.run(data), scaler_loaded.run(data))
 
 
 def test_one_hot_encoder():
