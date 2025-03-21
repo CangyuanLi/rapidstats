@@ -37,10 +37,16 @@ DATA = (
 
 
 def test_min_max_scaler():
+    ref = sklearn.preprocessing.MinMaxScaler().fit_transform(DATA)
 
     np.testing.assert_allclose(
-        sklearn.preprocessing.MinMaxScaler().fit_transform(DATA),
+        ref,
         rs.preprocessing.MinMaxScaler().fit_transform(DATA).to_numpy(),
+    )
+
+    np.testing.assert_allclose(
+        ref,
+        rs.preprocessing.MinMaxScaler().run(DATA).to_numpy(),
     )
 
     # test inverse transform
