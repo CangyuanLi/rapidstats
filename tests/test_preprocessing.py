@@ -66,6 +66,11 @@ def test_min_max_scaler_save():
             scaler.scale_.to_polars(), scaler_loaded.scale_.to_polars()
         )
         assert scaler.feature_names_in_ == scaler_loaded.feature_names_in_
+        assert scaler.feature_range == scaler_loaded.feature_range
+
+        polars.testing.assert_frame_equal(
+            scaler.transform(DATA), scaler_loaded.transform(DATA)
+        )
 
 
 def test_standard_scaler():

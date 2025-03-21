@@ -46,9 +46,14 @@ class MinMaxScaler:
     """
 
     def __init__(self, feature_range: tuple[float, float] = (0, 1)):
-        self._feature_range = feature_range
-        self._range_min, self._range_max = feature_range
+        self.feature_range = feature_range
+        self._set_range_vars()
+
+    def _set_range_vars(self) -> Self:
+        self._range_min, self._range_max = self.feature_range
         self._range_diff = self._range_max - self._range_min
+
+        return self
 
     def fit(self, X: nwt.IntoDataFrameT) -> Self:
         """_summary_
@@ -141,11 +146,17 @@ class MinMaxScaler:
 
             self.min_.write_parquet(tmpdir / "min_.parquet")
             self.scale_.write_parquet(tmpdir / "scale_.parquet")
-            _write_list(self.feature_names_in_, tmpdir / "feature_names_in_.txt")
+            _write_json(
+                {
+                    "feature_names_in_": self.feature_names_in_,
+                    "feature_range": self.feature_range,
+                },
+                tmpdir / "instance_vars.json",
+            )
 
             archive.write(tmpdir / "min_.parquet", "min_.parquet")
             archive.write(tmpdir / "scale_.parquet", "scale_.parquet")
-            archive.write(tmpdir / "feature_names_in_.txt", "feature_names_in_.txt")
+            archive.write(tmpdir / "instance_vars.json", "instance_vars.json")
 
         return self
 
@@ -174,7 +185,11 @@ class MinMaxScaler:
             self.scale_ = nw.read_parquet(
                 f"{tmpdir}/scale_.parquet", native_namespace=pl
             )
-            self.feature_names_in_ = _read_list(f"{tmpdir}/feature_names_in_.txt")
+            instance_vars = _read_json(f"{tmpdir}/instance_vars.json")
+            self.feature_names_in_ = instance_vars["feature_names_in_"]
+            self.feature_range = tuple(instance_vars["feature_range"])
+
+            self._set_range_vars()
 
         return self
 
