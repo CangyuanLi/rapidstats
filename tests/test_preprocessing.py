@@ -68,6 +68,48 @@ def test_min_max_scaler_save():
         assert scaler.feature_names_in_ == scaler_loaded.feature_names_in_
 
 
+def test_standard_scaler():
+    # If using polars backend, as here, NaN is not ignored during mean. Added a note to
+    # the docstring to warn users of this. Also, use a default ddof of 1, but use 0 here
+    # to match sklearn's behavior.
+    data = DATA.fill_nan(None)
+
+    reference = sklearn.preprocessing.StandardScaler().fit_transform(data)
+
+    np.testing.assert_allclose(
+        reference,
+        rs.preprocessing.StandardScaler(ddof=0).fit_transform(data).to_numpy(),
+    )
+
+    np.testing.assert_allclose(
+        reference, rs.preprocessing.StandardScaler(ddof=0).run(data).to_numpy()
+    )
+
+    # test inverse transform
+    scaler = rs.preprocessing.StandardScaler()
+    polars.testing.assert_frame_equal(
+        data,
+        scaler.inverse_transform(scaler.fit_transform(data)),
+    )
+
+    # test save and load
+    with tempfile.TemporaryFile() as f:
+        scaler = rs.preprocessing.StandardScaler()
+        scaler.fit(data)
+        scaler.save(f)
+
+        scaler_loaded = rs.preprocessing.StandardScaler().load(f)
+
+        polars.testing.assert_frame_equal(
+            scaler.mean_.to_polars(), scaler_loaded.mean_.to_polars()
+        )
+        polars.testing.assert_frame_equal(
+            scaler.std_.to_polars(), scaler_loaded.std_.to_polars()
+        )
+        assert scaler.feature_names_in_ == scaler_loaded.feature_names_in_
+        assert scaler.ddof == scaler_loaded.ddof
+
+
 def test_one_hot_encoder():
     df1 = pl.DataFrame({"x": ["a", None, "b"]})
     df2 = pl.DataFrame({"x": ["a", None, "a"]})

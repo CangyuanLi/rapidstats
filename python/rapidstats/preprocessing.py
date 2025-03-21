@@ -1,3 +1,4 @@
+import json
 import tempfile
 import zipfile
 from pathlib import Path
@@ -20,6 +21,16 @@ def _write_list(lst: list, path: PathLike):
     with open(path, "w") as f:
         for x in lst:
             f.write(f"{x}\n")
+
+
+def _read_json(path: PathLike) -> dict:
+    with open(path) as f:
+        return json.load(f)
+
+
+def _write_json(obj, path: PathLike):
+    with open(path, "w") as f:
+        json.dump(obj, f)
 
 
 class MinMaxScaler:
@@ -164,6 +175,92 @@ class MinMaxScaler:
                 f"{tmpdir}/scale_.parquet", native_namespace=pl
             )
             self.feature_names_in_ = _read_list(f"{tmpdir}/feature_names_in_.txt")
+
+        return self
+
+
+class StandardScaler:
+    """_summary_
+
+    !!! Null Handling
+        `rapidstats` uses [narwhals](https://narwhals-dev.github.io/narwhals/) to ingest
+        supported DataFrames. However, null-handling can differ across backends. For
+        example, if using a Polars backend, NaNs are valid numbers, not missing.
+        Therefore, the mean / standard deviation of a column with NaNs will be NaN.
+        Ensure your input is sanitized according to your specific backend before using
+        `StandardScaler`.
+    """
+
+    def __init__(self, ddof: int = 1):
+        self.ddof = ddof
+
+    @nw.narwhalify
+    def fit(self, X: nwt.IntoDataFrame) -> Self:
+        self.mean_ = X.select(nws.all().mean())
+        self.std_ = X.select(nws.all().std(ddof=self.ddof))
+        self.feature_names_in_ = X.columns
+
+        return self
+
+    @nw.narwhalify
+    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return X.select(
+            nw.col(c).__sub__(self.mean_[c]).__truediv__(self.std_[c])
+            for c in self.feature_names_in_
+        )
+
+    @nw.narwhalify
+    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return self.fit(X).transform(X)
+
+    @nw.narwhalify
+    def inverse_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return X.select(
+            nw.col(c).__mul__(self.std_[c]).__add__(self.mean_[c])
+            for c in self.feature_names_in_
+        )
+
+    @nw.narwhalify
+    def run(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        return X.select(
+            nws.all()
+            .__sub__(nws.all().mean())
+            .__truediv__(nws.all().std(ddof=self.ddof))
+        )
+
+    def save(self, path: PathLike) -> Self:
+        with zipfile.ZipFile(
+            path, "w"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            self.mean_.write_parquet(tmpdir / "mean_.parquet")
+            self.std_.write_parquet(tmpdir / "std_.parquet")
+            _write_json(
+                {
+                    "feature_names_in_": self.feature_names_in_,
+                    "ddof": self.ddof,
+                },
+                tmpdir / "instance_vars.json",
+            )
+
+            archive.write(tmpdir / "mean_.parquet", "mean_.parquet")
+            archive.write(tmpdir / "std_.parquet", "std_.parquet")
+            archive.write(tmpdir / "instance_vars.json", "instance_vars.json")
+
+        return self
+
+    def load(self, path: PathLike) -> Self:
+        with zipfile.ZipFile(
+            path, "r"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            archive.extractall(tmpdir)
+
+            self.mean_ = nw.read_parquet(f"{tmpdir}/mean_.parquet", native_namespace=pl)
+            self.std_ = nw.read_parquet(f"{tmpdir}/std_.parquet", native_namespace=pl)
+            instance_vars = _read_json(f"{tmpdir}/instance_vars.json")
+            self.feature_names_in_ = instance_vars["feature_names_in_"]
+            self.ddof = instance_vars["ddof"]
 
         return self
 
