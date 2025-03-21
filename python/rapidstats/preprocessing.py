@@ -280,6 +280,95 @@ class StandardScaler:
         return self
 
 
+class RobustScaler:
+    def __init__(self, quantile_range: tuple[float, float] = (0.25, 0.75)):
+        self.quantile_range = quantile_range
+
+    @nw.narwhalify
+    def fit(self, X: nwt.IntoDataFrame) -> Self:
+        self.feature_names_in_ = X.columns
+        self.median_ = X.select(nws.all().median())
+        self.scale_ = X.select(
+            nws.all()
+            .quantile(self.quantile_range[1], interpolation="linear")
+            .__sub__(nws.all().quantile(self.quantile_range[0], interpolation="linear"))
+        )
+
+        return self
+
+    @nw.narwhalify
+    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return X.select(
+            nw.col(c).__sub__(self.median_[c]).__truediv__(self.scale_[c])
+            for c in self.feature_names_in_
+        )
+
+    @nw.narwhalify
+    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return self.fit(X).transform(X)
+
+    @nw.narwhalify
+    def inverse_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+        return X.select(
+            nw.col(c).__mul__(self.scale_[c]).__add__(self.median_[c])
+            for c in self.feature_names_in_
+        )
+
+    @nw.narwhalify
+    def run(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        return X.select(
+            nws.all()
+            .__sub__(nws.all().median())
+            .__truediv__(
+                nws.all()
+                .quantile(self.quantile_range[1], interpolation="linear")
+                .__sub__(
+                    nws.all().quantile(self.quantile_range[0], interpolation="linear")
+                )
+            )
+        )
+
+    def save(self, path: PathLike) -> Self:
+        with zipfile.ZipFile(
+            path, "w"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            self.median_.write_parquet(tmpdir / "median_.parquet")
+            self.scale_.write_parquet(tmpdir / "scale_.parquet")
+            _write_json(
+                {
+                    "feature_names_in_": self.feature_names_in_,
+                    "quantile_range": self.quantile_range,
+                },
+                tmpdir / "instance_vars.json",
+            )
+
+            archive.write(tmpdir / "median_.parquet", "median_.parquet")
+            archive.write(tmpdir / "scale_.parquet", "scale_.parquet")
+            archive.write(tmpdir / "instance_vars.json", "instance_vars.json")
+
+        return self
+
+    def load(self, path: PathLike) -> Self:
+        with zipfile.ZipFile(
+            path, "r"
+        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+            archive.extractall(tmpdir)
+
+            self.median_ = nw.read_parquet(
+                f"{tmpdir}/median_.parquet", native_namespace=pl
+            )
+            self.scale_ = nw.read_parquet(
+                f"{tmpdir}/scale_.parquet", native_namespace=pl
+            )
+            instance_vars = _read_json(f"{tmpdir}/instance_vars.json")
+            self.feature_names_in_ = instance_vars["feature_names_in_"]
+            self.quantile_range = tuple(instance_vars["quantile_range"])
+
+        return self
+
+
 class OneHotEncoder:
     """One-hot encodes data.
 

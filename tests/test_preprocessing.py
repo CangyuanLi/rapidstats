@@ -129,6 +129,51 @@ def test_standard_scaler():
         polars.testing.assert_frame_equal(scaler.run(data), scaler_loaded.run(data))
 
 
+def test_robust_scaler():
+    data = DATA.fill_nan(None)
+
+    reference = sklearn.preprocessing.RobustScaler().fit_transform(data)
+
+    np.testing.assert_allclose(
+        reference,
+        rs.preprocessing.RobustScaler().fit_transform(data).to_numpy(),
+    )
+
+    np.testing.assert_allclose(
+        reference, rs.preprocessing.RobustScaler().run(data).to_numpy()
+    )
+
+    # test inverse transform
+    scaler = rs.preprocessing.RobustScaler()
+    polars.testing.assert_frame_equal(
+        data,
+        scaler.inverse_transform(scaler.fit_transform(data)),
+    )
+
+    # test save and load
+    with tempfile.TemporaryFile() as f:
+        scaler = rs.preprocessing.RobustScaler(quantile_range=(0.1, 0.9))
+        scaler.fit(data)
+        scaler.save(f)
+
+        scaler_loaded = rs.preprocessing.RobustScaler().load(f)
+
+        polars.testing.assert_frame_equal(
+            scaler.median_.to_polars(), scaler_loaded.median_.to_polars()
+        )
+        polars.testing.assert_frame_equal(
+            scaler.scale_.to_polars(), scaler_loaded.scale_.to_polars()
+        )
+        assert scaler.feature_names_in_ == scaler_loaded.feature_names_in_
+        assert scaler.quantile_range == scaler_loaded.quantile_range
+
+        polars.testing.assert_frame_equal(
+            scaler.transform(data), scaler_loaded.transform(data)
+        )
+
+        polars.testing.assert_frame_equal(scaler.run(data), scaler_loaded.run(data))
+
+
 def test_one_hot_encoder():
     df1 = pl.DataFrame({"x": ["a", None, "b"]})
     df2 = pl.DataFrame({"x": ["a", None, "a"]})
