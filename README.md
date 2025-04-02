@@ -14,7 +14,7 @@
 
 ## What is it?
 
-**rapidstats** is a minimal library that implements fast statistical routines in Rust and Polars. Currently, its core purpose is to provide the Bootstrap class. Unlike scipy.stats.bootstrap, the Bootstrap class contains specialized functions (for e.g. confusion matrix, ROC-AUC, and so on) implemented in Rust as well as a generic interface for any Python callable. This makes it significantly faster than passing in a callable on the Python side. For example, bootstrapping confusion matrix statistics can be up to 40x faster.
+**rapidstats** is a minimal library that implements fast statistical routines in Rust and Polars. While similar in spirit, it **does not** aim to be a complete re-implementation of libraries like **scikit-learn** or **scipy**. Only functions that can be significantly faster (e.g. a bootstrap class that offers optimized Rust kernels for metrics such as ROC-AUC) or significantly more ergonomic (e.g. dataframe-first encoders and scalers) are added.
 
 *This library is in an alpha state. Although all functions are tested against existing libraries, use at your own risk. The API is subject to change very frequently.*
 
@@ -22,7 +22,7 @@
 
 ## Dependencies
 
-**rapidstats** has a minimal set of dependencies. It only depends on Polars and tqdm (for progress bars). You may install pyarrow (`pip install rapidstats[pyarrow]`) to allow functions to take NumPy arrays, Pandas objects, and other objects that may be converted through Arrow.
+**rapidstats** has a minimal set of dependencies. It only depends on **polars**, **narwhals** (for dataframe compatibility), and **tqdm** (for progress bars). You may install **pyarrow** (`pip install rapidstats[pyarrow]`) to allow functions to take **numpy** arrays, **pandas** objects, and other objects that may be converted through Arrow.
 
 ## Installing
 
@@ -32,6 +32,13 @@ The easiest way is to install **rapidstats** is from PyPI using pip:
 pip install rapidstats
 ```
 
-# Notes
+# Performance
 
-The purpose of **rapidstats** is not to replace scipy or scikit-learn, which would be a massive undertaking. At the moment, only functions that are not easily achievable using existing libraries or functions that are significantly more performant (e.g. the core loop is implemented in Rust) will be added.
+**rapidstats** is very fast. For example, say you wanted the confusion matrix metrics for a 50,000 row dataset. You aren't sure what exact threshold you want yet, so you decide to compute the metrics for multiple thresholds, let's say 500. With sklearn, this takes 40 seconds. With **rapidstats**, this takes just .2 seconds, a 198x speedup! Furthermore, **rapidstats** can use a cumuluative sum algorithm that computes the metrics at all possible thresholds, not just these particular 500. So finding the metrics for 500 or 50,000 metrics takes the exact same amount of time. In addition, even just looping the **rapidstats** version is a 58x speedup, since **rapidstats** applies several optimizations, such as computing the basic confusion matrix (TP, FP, FN, TN) using a nice bincount trick and avoiding re-computing this basic matrix for each different metric.
+
+![](https://raw.githubusercontent.com/CangyuanLi/rapidstats/main/docs/images/cm_at_t.png)
+
+
+Similarly, calculating the bootstrapped (100 iterations) ROC-AUC of a 25,000 sample dataset takes only .15 seconds, compared to .83 seconds for the equivalent sklearn + scipy operation, a speedup of 5.3x.
+
+![](https://raw.githubusercontent.com/CangyuanLi/rapidstats/main/docs/images/bs_roc_auc.png)
