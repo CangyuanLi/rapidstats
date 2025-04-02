@@ -34,12 +34,14 @@ def pandas_setup(n_rows, n_cols):
     return {"df": polars_setup(n_rows, n_cols)["df"].to_pandas()}
 
 
+@pybench.metadata(group="correlation_matrix")
 @pybench.config(repeat=5)
 @pybench.parametrize({"n_rows": ROW_SIZES, "n_cols": COL_SIZES}, setup=pandas_setup)
 def bench_pandas_correlation_matrix(df: pd.DataFrame):
     df.corr()
 
 
+@pybench.metadata(group="correlation_matrix")
 @pybench.config(repeat=5)
 @pybench.parametrize({"n_rows": ROW_SIZES, "n_cols": COL_SIZES}, setup=polars_setup)
 def bench_correlation_matrix(df: pl.DataFrame):

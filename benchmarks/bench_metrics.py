@@ -18,41 +18,49 @@ def sample_df(n):
     return {"df": DF.sample(n, seed=SEED)}
 
 
+@pybench.metadata(group="confusion_matrix")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_confusion_matrix(df):
     rs.metrics.confusion_matrix(df["y_true"], df["y_pred"])
 
 
+@pybench.metadata(group="confusion_matrix")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_sklearn_confusion_matrix(df):
     sklearn.metrics.confusion_matrix(df["y_true"], df["y_pred"])
 
 
+@pybench.metadata(group="roc_auc")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_roc_auc(df):
     rs.metrics.roc_auc(df["y_true"], df["y_score"])
 
 
+@pybench.metadata(group="roc_auc")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_sklearn_roc_auc(df):
     sklearn.metrics.roc_auc_score(df["y_true"], df["y_score"])
 
 
+@pybench.metadata(group="mean_squared_error")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_mean_squared_error(df):
     rs.metrics.mean_squared_error(df["y_score"], df["y_score"])
 
 
+@pybench.metadata(group="mean_squared_error")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_sklearn_mean_squared_error(df):
     sklearn.metrics.mean_squared_error(df["y_score"], df["y_score"])
 
 
+@pybench.metadata(group="r2")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_r2(df):
     rs.metrics.r2(df["y_score"], df["y_score"])
 
 
+@pybench.metadata(group="r2")
 @pybench.parametrize({"n": SIZES}, setup=sample_df)
 def bench_sklearn_r2(df):
     sklearn.metrics.r2_score(df["y_score"], df["y_score"])
@@ -68,6 +76,7 @@ def sample_df_thresh(n, n_thresholds, **kwargs):
     return {"df": DF.sample(n, seed=SEED), "thresholds": thresholds} | kwargs
 
 
+@pybench.metadata(group="confusion_matrix_at_thresholds")
 @pybench.config(repeat=1)
 @pybench.parametrize(
     {
@@ -86,6 +95,7 @@ def bench_confusion_matrix_at_thresholds(df, thresholds, strategy):
     )
 
 
+@pybench.metadata(group="confusion_matrix_at_thresholds")
 @pybench.config(repeat=1)
 @pybench.parametrize(
     {

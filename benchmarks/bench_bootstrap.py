@@ -24,11 +24,13 @@ DF = (
 )
 
 
+@pybench.metadata(group="bootstrap_roc_auc")
 @pybench.config(repeat=10)
 def bench_bootstrap_roc_auc():
     BS.roc_auc(DF["y_true"], DF["y_score"])
 
 
+@pybench.metadata(group="bootstrap_roc_auc")
 @pybench.config(repeat=5)
 def bench_sklearn_bootstrap_roc_auc():
     data = (DF["y_true"], DF["y_score"])
@@ -41,6 +43,7 @@ def bench_sklearn_bootstrap_roc_auc():
     )
 
 
+@pybench.metadata(group="bootstrap_roc_auc")
 @pybench.config(repeat=5)
 def bench_python_multithreaded_bootstrap_roc_auc():
     with concurrent.futures.ThreadPoolExecutor() as pool:
