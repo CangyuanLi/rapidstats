@@ -152,3 +152,5 @@ cython_debug/
 **/*-checkpoint*
 
 temp*
+
+benchmarks/results/

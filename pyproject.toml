@@ -32,6 +32,11 @@ module-name = "rapidstats._rustystats"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.pybench]
+repeat = 50
+number = 1
+warmups = 1
+
 [tool.isort]
 profile = "black"
 
