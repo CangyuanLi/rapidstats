@@ -4,7 +4,7 @@ from typing import Union
 
 import polars as pl
 
-from ._utils import _PLUGIN_PATH, IntoExprColumn
+from ._utils import _PLUGIN_PATH
 
 
 class _Enum:
