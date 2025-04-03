@@ -1,22 +1,30 @@
+from __future__ import annotations
+
 from typing import Literal
 
 import polars as pl
 
-from ._utils import _PLUGIN_PATH, IntoExpr, _into_expr
+from ._utils import (
+    _PLUGIN_PATH,
+    IntoExprColumn,
+    NumericLiteral,
+    _numeric_to_expr,
+    _str_to_expr,
+)
 
 
 def auc(
-    x: IntoExpr,
-    y: IntoExpr,
+    x: IntoExprColumn,
+    y: IntoExprColumn,
     method: Literal["rectangular", "trapezoidal"] = "trapezoidal",
 ) -> pl.Expr:
     """Computes the area under the curve (AUC) via numerical integration.
 
     Parameters
     ----------
-    x : IntoExpr
+    x : pl.Expr | str
         The x-axis
-    y : IntoExpr
+    y : pl.Expr | str
         The y-axis
     method : Literal["rectangular", "trapezoidal"], optional
         If "rectangular", use rectangular integration, if "trapezoidal", use
@@ -42,8 +50,8 @@ def auc(
         plugin_path=_PLUGIN_PATH,
         function_name="pl_auc",
         args=[
-            _into_expr(x).cast(pl.Float64),
-            _into_expr(y).cast(pl.Float64),
+            _str_to_expr(x).cast(pl.Float64),
+            _str_to_expr(y).cast(pl.Float64),
             pl.lit(is_trapezoidal),
         ],
         returns_scalar=True,
@@ -51,8 +59,8 @@ def auc(
 
 
 def is_close(
-    x: IntoExpr,
-    y: IntoExpr,
+    x: IntoExprColumn | NumericLiteral,
+    y: IntoExprColumn | NumericLiteral,
     rtol: float = 1e-05,
     atol: float = 1e-08,
     null_equal: bool = False,
@@ -61,8 +69,8 @@ def is_close(
 
     Parameters
     ----------
-    x : IntoExpr
-    y : IntoExpr
+    x : pl.Expr | str | float
+    y : pl.Expr | str | float
     rtol : float, optional
         Relative tolerance, by default 1e-05
     atol : float, optional
@@ -74,8 +82,8 @@ def is_close(
     -------
     pl.Expr
     """
-    x = _into_expr(x)
-    y = _into_expr(y)
+    x = _numeric_to_expr(x)
+    y = _numeric_to_expr(y)
 
     res = x.sub(y).abs().le(pl.lit(atol).add(rtol).mul(y.abs()))
 

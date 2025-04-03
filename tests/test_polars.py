@@ -70,6 +70,8 @@ def test_is_close():
     assert df["correct"].eq(df["is_close"]).sum() == 4
     assert df["correct_null_equal"].eq(df["is_close_null_equal"]).sum() == 5
 
+    assert df.with_columns(rs.polars.is_close(1, 2).alias("tmp"))["tmp"].sum() == 0
+
 
 def test_format():
     x = 10_000_000
