@@ -4,7 +4,7 @@ from typing import Union
 
 import polars as pl
 
-from ._utils import _PLUGIN_PATH, IntoExpr
+from ._utils import _PLUGIN_PATH, IntoExprColumn
 
 
 class _Enum:
@@ -46,15 +46,6 @@ class FormatSpec:
 
 
 def _parse_format_string(format_string):
-    """
-    Split a format string into formatters and text in between.
-
-    Args:
-        format_string (str): The format string, e.g. "Hello {}, how are {}?"
-
-    Returns:
-        tuple: (list of text parts, count of formatters)
-    """
     parts = []
     formatter = []
     current_part = []
@@ -180,7 +171,7 @@ def _apply_formatter(expr: pl.Expr, format_spec: FormatSpec) -> pl.Expr:
     return expr
 
 
-def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
+def format(f_string: str, *args: Union[pl.Expr, str, float]) -> pl.Expr:
     """Format expressions as a string using Python f-string syntax.
 
     Parameters
@@ -190,7 +181,8 @@ def format(f_string: str, *args: Union[IntoExpr, float]) -> pl.Expr:
         "{:.3f}". Currently, the only supported types are "f" and "%". Width, alignment,
         and fill are also not supported.
     args
-        Expression(s) that fill the placeholders
+        Expression(s) that fill the placeholders. Note that strings are NOT parsed as
+        columns.
 
     Returns
     -------
