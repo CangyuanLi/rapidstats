@@ -38,6 +38,29 @@ def auc(
     ------
     ValueError
         If `method` is not one of `rectangular` or `trapezoidal`
+
+    Examples
+    --------
+    ``` py
+    import polars as pl
+    import rapidstats.polars as rps
+
+    df = pl.DataFrame({"x": [1, 2, 3], "y": [5, 6, 7]})
+    df.select(rps.auc("x", "y"))
+    ```
+    ``` title="output"
+    shape: (1, 1)
+    ┌──────┐
+    │ x    │
+    │ ---  │
+    │ f64  │
+    ╞══════╡
+    │ 12.0 │
+    └──────┘
+    ```
+
+    Added in version 0.2.0
+    ----------------------
     """
     if method == "trapezoidal":
         is_trapezoidal = True
@@ -81,6 +104,30 @@ def is_close(
     Returns
     -------
     pl.Expr
+
+    Examples
+    --------
+    ``` py
+    import polars as pl
+    import rapidstats.polars as rps
+
+    df = pl.DataFrame({"x": [1.0, 1.1], "y": [.999999999, 5]})
+    df.select(rps.is_close("x", "y"))
+    ```
+    ``` title="output"
+    shape: (2, 1)
+    ┌───────┐
+    │ x     │
+    │ ---   │
+    │ bool  │
+    ╞═══════╡
+    │ true  │
+    │ false │
+    └───────┘
+    ```
+
+    Added in version 0.2.0
+    ----------------------
     """
     x = _numeric_to_expr(x)
     y = _numeric_to_expr(y)

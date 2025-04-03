@@ -197,11 +197,11 @@ def format(f_string: str, *args: Union[pl.Expr, str, float]) -> pl.Expr:
     --------
     ``` py
     import polars as pl
-    import rapidstats as rs
+    import rapidstats.polars as rps
 
     df = pl.DataFrame({"x": 1123.09873, "y": "foo"})
     df.select(
-        rs.polars.format(
+        rps.format(
             "{:,.3f} is {} is {}", pl.col("x"), pl.col("y"), "bar"
         )
     )
