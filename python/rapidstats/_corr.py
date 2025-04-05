@@ -1,12 +1,11 @@
 import itertools
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
+import narwhals as nw
+import narwhals.typing as nwt
 import polars as pl
-import polars.selectors as cs
-from polars._typing import CorrelationMethod, FrameInitTypes
-from polars.interchange.protocol import SupportsInterchange
 
-ConvertibleToPolars = Union[SupportsInterchange, FrameInitTypes]
+CorrelationMethod = Literal["pearson", "spearman"]
 
 
 def _pairs(l1, l2) -> list[tuple]:
@@ -17,30 +16,12 @@ def _corr_expr(c1, c2, method: CorrelationMethod) -> pl.Expr:
     return pl.corr(c1, c2, method=method).alias(f"{c1}_{c2}")
 
 
-def _to_polars(
-    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
-) -> Union[pl.LazyFrame, pl.DataFrame]:
-    if isinstance(data, pl.DataFrame):
-        return data
-    elif isinstance(data, pl.LazyFrame):
-        return data
-    elif hasattr(data, "to_polars"):
-        return data.to_polars()
-
-    try:
-        return pl.DataFrame(data)
-    except TypeError:
-        if hasattr(data, "__dataframe__"):
-            return pl.from_dataframe(data)
-        else:
-            raise TypeError("`data` must be convertible to a Polars DataFrames")
-
-
 def correlation_matrix(
-    data: Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars],
+    data: nwt.IntoFrameT,
     l1: Optional[Union[list[str], list[tuple[str, str]]]] = None,
     l2: Optional[list[str]] = None,
     method: CorrelationMethod = "pearson",
+    index_name: str = "",
 ) -> pl.DataFrame:
     """
     !!! warning
@@ -57,9 +38,8 @@ def correlation_matrix(
 
     Parameters
     ----------
-    data : Union[pl.LazyFrame, pl.DataFrame, ConvertibleToPolars]
-        The input DataFrame. It must be either a Polars Frame or something convertible
-        to a Polars Frame.
+    data : nwt.IntoFrameT
+        The input data
     l1 : Union[list[str], list[tuple[str, str]]], optional
         A list of columns to appear as the columns of the correlation matrix,
         by default None
@@ -68,6 +48,10 @@ def correlation_matrix(
         by default None
     method : CorrelationMethod, optional
         How to calculate the correlation, by default "pearson"
+    index_name : str, optional
+        The name of the `l2` column in the final output, by default ""
+
+        !!! Added in version 0.2.0
 
     Returns
     -------
@@ -77,11 +61,10 @@ def correlation_matrix(
     Added in version 0.0.24
     -----------------------
     """
-    # pl.corr works with nulls but NOT NaNs
-    pf = _to_polars(data).select(cs.numeric() | cs.boolean()).fill_nan(None)
+    pf = nw.from_native(data).to_polars().lazy()
 
     if l1 is None and l2 is None:
-        original = pf.columns
+        original = pf.collect_schema().names()
         new_columns = [f"{i}" for i, _ in enumerate(original)]
         combinations = itertools.combinations(new_columns, r=2)
         l1 = original[:-1]
@@ -103,7 +86,7 @@ def correlation_matrix(
     else:
         assert l1 is not None
         assert l2 is not None
-        valid_cols = set(pf.columns)
+        valid_cols = set(pf.collect_schema().names())
         l1 = [c for c in l1 if c in valid_cols]
         l2 = [c for c in l2 if c in valid_cols]
 
@@ -141,8 +124,8 @@ def correlation_matrix(
 
     # Set the row names
     valid_old_row_names = [new_to_old_mapper[c] for c in new_row_names]
-    corr_mat = corr_mat.with_columns(pl.Series("", valid_old_row_names)).select(
-        "", *valid_old_names
+    corr_mat = corr_mat.with_columns(pl.Series(index_name, valid_old_row_names)).select(
+        index_name, *valid_old_names
     )
 
     return corr_mat

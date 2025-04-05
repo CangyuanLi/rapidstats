@@ -45,7 +45,7 @@ def reference_correlation_matrix(df: pd.DataFrame):
 
 def test_correlation_matrix():
     ref = reference_correlation_matrix(DF.to_pandas())
-    rs = rapidstats.correlation_matrix(DF).drop("").to_numpy()
+    rs = rapidstats.correlation_matrix(DF.fill_nan(None)).drop("").to_numpy()
 
     assert np.allclose(ref, rs, equal_nan=True)
 
@@ -71,7 +71,7 @@ def test_correlation_matrix_combinations():
     ref_corr_mat = pd.concat(ref_corr_mats, axis=0)
 
     corr_mat = (
-        rapidstats.correlation_matrix(DF, combinations)
+        rapidstats.correlation_matrix(DF.fill_nan(None), combinations)
         .unpivot(index="")
         .rename({"": "col1", "variable": "col2"})
         .filter(pl.col("col1") != pl.col("col2"))
@@ -86,18 +86,3 @@ def test_correlation_matrix_combinations():
     assert res.height == corr_mat.height
 
     assert np.allclose(res["ref"], res["value"])
-
-
-def test_correlation_matrix_filter():
-    df = pl.DataFrame(
-        {
-            "a": ["x", "y", "z"],
-            "b": [1, 2, 3],
-            "c": [4, 5, 6],
-            "d": [7, 8, 9],
-        }
-    )
-
-    rapidstats.correlation_matrix(df)
-
-    rapidstats.correlation_matrix(df, ["a", "b"], ["c", "d"])
