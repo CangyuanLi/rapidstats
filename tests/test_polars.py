@@ -4,6 +4,7 @@ import polars.testing as plt
 import pytest
 
 import rapidstats as rs
+import rapidstats.polars as prs
 
 np.random.seed(208)
 
@@ -91,3 +92,52 @@ def test_format():
     )
 
     plt.assert_series_equal(df["formatted_correct"], df["formatted"], check_names=False)
+
+
+def test_sum_horizontal():
+    df = pl.DataFrame({"a": [1, None, None], "b": [1, None, None], "c": [1, None, 1]})
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal("a", "b", "c", null_strategy="kleene").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, None, 1]),
+    )
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal("a", "b", "c", null_strategy="ignore").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, 0, 1]),
+    )
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal("a", "b", "c", null_strategy="propagate").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, None, None]),
+    )
+
+    # Test that different ways of specifying the inputs result in the same output
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal(["a", "b", "c"], null_strategy="kleene").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, None, 1]),
+    )
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal(["a", "b", pl.col("c")], null_strategy="kleene").alias(
+                "x"
+            )
+        ).to_series(),
+        pl.Series("x", [3, None, 1]),
+    )
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal(pl.col("a"), "b", "c", null_strategy="kleene").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, None, 1]),
+    )

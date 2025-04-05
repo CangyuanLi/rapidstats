@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Literal
 
 import polars as pl
 
 from ._utils import (
     _PLUGIN_PATH,
+    IntoExpr,
     IntoExprColumn,
     NumericLiteral,
     _numeric_to_expr,
+    _parse_into_list_of_exprs,
     _str_to_expr,
 )
 
@@ -138,3 +141,31 @@ def is_close(
         res = res.or_(x.is_null().and_(y.is_null()))
 
     return res
+
+
+def sum_horizontal(
+    *exprs: IntoExpr | Iterable[IntoExpr],
+    null_strategy: Literal["kleene", "ignore", "propagate"] = "kleene",
+) -> pl.Expr:
+    if null_strategy == "kleene":
+        exprs = _parse_into_list_of_exprs(*exprs)
+
+        return (
+            pl.when(pl.all_horizontal(expr.is_null()) for expr in exprs)
+            .then(None)
+            .otherwise(pl.sum_horizontal(exprs))
+        )
+    elif null_strategy == "ignore":
+        return pl.sum_horizontal(exprs)
+    elif null_strategy == "propagate":
+        exprs = _parse_into_list_of_exprs(*exprs)
+
+        return (
+            pl.when(pl.any_horizontal(expr.is_null() for expr in exprs))
+            .then(None)
+            .otherwise(pl.sum_horizontal(exprs))
+        )
+    else:
+        raise ValueError(
+            f"Invalid `null_strategy` {null_strategy}, must be one of `kleene`, `ignore`, or `propagate`"
+        )
