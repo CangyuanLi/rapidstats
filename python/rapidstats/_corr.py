@@ -100,8 +100,7 @@ def correlation_matrix(
     new_to_old_mapper = {new: old for new, old in zip(new_columns, original)}
 
     corr_mat = (
-        pf.lazy()
-        .select(original)
+        pf.select(original)
         .rename(old_to_new_mapper)
         .select(_corr_expr(c1, c2, method=method) for c1, c2 in combinations)
         .unpivot()
