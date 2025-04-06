@@ -141,3 +141,10 @@ def test_sum_horizontal():
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
+
+    plt.assert_series_equal(
+        df.select(
+            prs.sum_horizontal(pl.col("a", "b", "c"), null_strategy="kleene").alias("x")
+        ).to_series(),
+        pl.Series("x", [3, None, 1]),
+    )
