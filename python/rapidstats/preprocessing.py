@@ -209,8 +209,9 @@ class StandardScaler:
     def __init__(self, ddof: int = 1):
         self.ddof = ddof
 
-    @nw.narwhalify
     def fit(self, X: nwt.IntoDataFrame):
+        X = nw.from_native(X, eager_only=True)
+
         self.mean_ = X.select(nws.all().mean())
         self.std_ = X.select(nws.all().std(ddof=self.ddof))
         self.feature_names_in_ = X.columns
@@ -218,7 +219,7 @@ class StandardScaler:
         return self
 
     @nw.narwhalify
-    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         return X.select(
             nw.col(c).__sub__(self.mean_[c]).__truediv__(self.std_[c])
             for c in self.feature_names_in_
@@ -229,7 +230,7 @@ class StandardScaler:
         return self.fit(X).transform(X)
 
     @nw.narwhalify
-    def inverse_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         return X.select(
             nw.col(c).__mul__(self.std_[c]).__add__(self.mean_[c])
             for c in self.feature_names_in_
@@ -297,18 +298,18 @@ class RobustScaler:
         return self
 
     @nw.narwhalify
-    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         return X.select(
             nw.col(c).__sub__(self.median_[c]).__truediv__(self.scale_[c])
             for c in self.feature_names_in_
         )
 
     @nw.narwhalify
-    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def fit_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         return self.fit(X).transform(X)
 
     @nw.narwhalify
-    def inverse_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         return X.select(
             nw.col(c).__mul__(self.scale_[c]).__add__(self.median_[c])
             for c in self.feature_names_in_
@@ -387,7 +388,7 @@ class OneHotEncoder:
         return self
 
     @nw.narwhalify
-    def transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
+    def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
         for c, unique_vals in self.categories_.items():
             for val in unique_vals:
                 X = X.with_columns(nw.col(c).__eq__(val).alias(f"{c}_{val}"))
