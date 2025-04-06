@@ -1,6 +1,6 @@
 import dataclasses
 import enum
-from typing import Union
+from typing import Optional, Union
 
 import polars as pl
 
@@ -39,10 +39,10 @@ class Sign(_Enum, enum.Enum):
 
 @dataclasses.dataclass
 class FormatSpec:
-    type_: str = None
-    separator: str = None
-    sign: str = None
-    precision: int = None
+    type_: Optional[str] = None
+    separator: Optional[str] = None
+    sign: Optional[str] = None
+    precision: Optional[int] = None
 
 
 def _parse_format_string(format_string):
