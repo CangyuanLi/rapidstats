@@ -681,6 +681,8 @@ class Bootstrap:
                     .select(final_cols)
                     .collect()
                 )
+            else:
+                raise ValueError()
 
     def roc_auc(
         self,

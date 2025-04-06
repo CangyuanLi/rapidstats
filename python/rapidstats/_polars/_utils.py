@@ -72,5 +72,5 @@ def _is_iterable(input: Any | Iterable[Any]) -> bool:
     )
 
 
-def _parse_into_list_of_exprs(*inputs: IntoExpr) -> list[pl.Expr]:
+def _parse_into_list_of_exprs(*inputs: IntoExpr | Iterable[IntoExpr]) -> list[pl.Expr]:
     return [_parse_into_expr(e) for e in _parse_inputs_as_iterable(inputs)]

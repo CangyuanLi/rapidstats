@@ -17,7 +17,7 @@ def _corr_expr(c1, c2, method: CorrelationMethod) -> pl.Expr:
 
 
 def correlation_matrix(
-    data: nwt.IntoFrameT,
+    data: nwt.IntoFrame,
     l1: Optional[Union[list[str], list[tuple[str, str]]]] = None,
     l2: Optional[list[str]] = None,
     method: CorrelationMethod = "pearson",

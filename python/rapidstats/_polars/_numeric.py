@@ -148,22 +148,22 @@ def sum_horizontal(
     null_method: Literal["kleene", "ignore", "propagate"] = "kleene",
 ) -> pl.Expr:
     if null_method == "kleene":
-        exprs = _parse_into_list_of_exprs(*exprs)
+        parsed_exprs = _parse_into_list_of_exprs(*exprs)
 
         return (
-            pl.when(pl.all_horizontal(expr.is_null()) for expr in exprs)
+            pl.when(pl.all_horizontal(expr.is_null()) for expr in parsed_exprs)
             .then(None)
-            .otherwise(pl.sum_horizontal(exprs))
+            .otherwise(pl.sum_horizontal(parsed_exprs))
         )
     elif null_method == "ignore":
         return pl.sum_horizontal(exprs)
     elif null_method == "propagate":
-        exprs = _parse_into_list_of_exprs(*exprs)
+        parsed_exprs = _parse_into_list_of_exprs(*exprs)
 
         return (
-            pl.when(pl.any_horizontal(expr.is_null() for expr in exprs))
+            pl.when(pl.any_horizontal(expr.is_null() for expr in parsed_exprs))
             .then(None)
-            .otherwise(pl.sum_horizontal(exprs))
+            .otherwise(pl.sum_horizontal(parsed_exprs))
         )
     else:
         raise ValueError(

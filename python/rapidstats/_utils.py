@@ -76,7 +76,7 @@ def _run_concurrent(
     preserve_order: bool = False,
     quiet: bool = False,
     **executor_kwargs,
-):
+) -> list:
     if executor_kwargs.get("max_workers") == 1:
         return [fn(i) for i in tqdm(iterable, disable=quiet)]
 
@@ -91,7 +91,7 @@ def _run_concurrent(
         with executor as pool:
             res = pool.map(fn, iterable)
 
-        return res
+        return list(res)
 
     with executor as pool:
         futures = [pool.submit(fn, i) for i in iterable]
