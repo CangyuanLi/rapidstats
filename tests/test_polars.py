@@ -99,21 +99,21 @@ def test_sum_horizontal():
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal("a", "b", "c", null_strategy="kleene").alias("x")
+            prs.sum_horizontal("a", "b", "c", null_method="kleene").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal("a", "b", "c", null_strategy="ignore").alias("x")
+            prs.sum_horizontal("a", "b", "c", null_method="ignore").alias("x")
         ).to_series(),
         pl.Series("x", [3, 0, 1]),
     )
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal("a", "b", "c", null_strategy="propagate").alias("x")
+            prs.sum_horizontal("a", "b", "c", null_method="propagate").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, None]),
     )
@@ -121,30 +121,28 @@ def test_sum_horizontal():
     # Test that different ways of specifying the inputs result in the same output
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal(["a", "b", "c"], null_strategy="kleene").alias("x")
+            prs.sum_horizontal(["a", "b", "c"], null_method="kleene").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal(["a", "b", pl.col("c")], null_strategy="kleene").alias(
-                "x"
-            )
+            prs.sum_horizontal(["a", "b", pl.col("c")], null_method="kleene").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal(pl.col("a"), "b", "c", null_strategy="kleene").alias("x")
+            prs.sum_horizontal(pl.col("a"), "b", "c", null_method="kleene").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
 
     plt.assert_series_equal(
         df.select(
-            prs.sum_horizontal(pl.col("a", "b", "c"), null_strategy="kleene").alias("x")
+            prs.sum_horizontal(pl.col("a", "b", "c"), null_method="kleene").alias("x")
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )

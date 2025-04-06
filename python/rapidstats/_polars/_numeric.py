@@ -145,9 +145,9 @@ def is_close(
 
 def sum_horizontal(
     *exprs: IntoExpr | Iterable[IntoExpr],
-    null_strategy: Literal["kleene", "ignore", "propagate"] = "kleene",
+    null_method: Literal["kleene", "ignore", "propagate"] = "kleene",
 ) -> pl.Expr:
-    if null_strategy == "kleene":
+    if null_method == "kleene":
         exprs = _parse_into_list_of_exprs(*exprs)
 
         return (
@@ -155,9 +155,9 @@ def sum_horizontal(
             .then(None)
             .otherwise(pl.sum_horizontal(exprs))
         )
-    elif null_strategy == "ignore":
+    elif null_method == "ignore":
         return pl.sum_horizontal(exprs)
-    elif null_strategy == "propagate":
+    elif null_method == "propagate":
         exprs = _parse_into_list_of_exprs(*exprs)
 
         return (
@@ -167,5 +167,5 @@ def sum_horizontal(
         )
     else:
         raise ValueError(
-            f"Invalid `null_strategy` {null_strategy}, must be one of `kleene`, `ignore`, or `propagate`"
+            f"Invalid `null_strategy` {null_method}, must be one of `kleene`, `ignore`, or `propagate`"
         )
