@@ -7,8 +7,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional, Union
 
-import narwhals as nw
-import narwhals.selectors as nws
+import narwhals.stable.v1 as nw
+import narwhals.stable.v1.selectors as nws
 import narwhals.typing as nwt
 import polars as pl
 
@@ -34,15 +34,6 @@ def _resolve_columns(
         return [columns]
     else:
         return columns
-
-
-def _lazy_resolve_columns(
-    columns: Optional[str | Iterable[str]],
-) -> nws.Selector | nw.Expr:
-    if columns is None:
-        return nws.all()
-    else:
-        return nw.col(columns)
 
 
 class MinMaxScaler:
@@ -109,7 +100,7 @@ class MinMaxScaler:
 
     @nw.narwhalify
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
+        return X.with_columns(
             nw.col(c).__mul__(self.scale_[c]).__add__(self.min_[c])
             for c in self.feature_names_in_
         )
@@ -119,24 +110,28 @@ class MinMaxScaler:
         return self.fit(X).transform(X)
 
     @nw.narwhalify
-    def run(
-        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
-    ) -> nwt.IntoFrameT:
-        selector = _lazy_resolve_columns(columns)
+    def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        return X.with_columns(
+            nw.col(c).__sub__(self.min_[c]).__truediv__(self.scale_[c])
+            for c in self.feature_names_in_
+        )
 
-        return X.select(
-            selector.__sub__(selector.min())
-            .__truediv__(selector.max().__sub__(selector.min()))
+    def _run_one(self, c: str) -> nw.Expr:
+        expr = nw.col(c)
+        min_ = expr.min()
+
+        return (
+            expr.__sub__(min_)
+            .__truediv__(expr.max().__sub__(min_))
             .__mul__(self._range_diff)
             .__add__(self._range_min)
         )
 
     @nw.narwhalify
-    def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
-            nw.col(c).__sub__(self.min_[c]).__truediv__(self.scale_[c])
-            for c in self.feature_names_in_
-        )
+    def run(
+        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoFrameT:
+        return X.with_columns(self._run_one(c) for c in _resolve_columns(X, columns))
 
     def save(self, path: PathLike):
         """_summary_
@@ -254,15 +249,16 @@ class StandardScaler:
             for c in self.feature_names_in_
         )
 
+    def _run_one(self, c: str) -> nw.Expr:
+        expr = nw.col(c)
+
+        return expr.__sub__(expr.mean()).__truediv__(expr.std(ddof=self.ddof))
+
     @nw.narwhalify
     def run(
         self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
     ) -> nwt.IntoFrameT:
-        selector = _lazy_resolve_columns(columns)
-
-        return X.select(
-            selector.__sub__(selector.mean()).__truediv__(selector.std(ddof=self.ddof))
-        )
+        return X.with_columns(self._run_one(c) for c in _resolve_columns(X, columns))
 
     def save(self, path: PathLike):
         with zipfile.ZipFile(
@@ -313,9 +309,10 @@ class RobustScaler:
 
         self.median_ = X.select(selector.median())
         self.scale_ = X.select(
-            selector.quantile(self.quantile_range[1], interpolation="linear").__sub__(
-                selector.quantile(self.quantile_range[0], interpolation="linear")
-            )
+            nw.col(c)
+            .quantile(self.quantile_range[1], interpolation="linear")
+            .__sub__(nw.col(c).quantile(self.quantile_range[0], interpolation="linear"))
+            for c in self.feature_names_in_
         )
 
         return self
@@ -340,21 +337,20 @@ class RobustScaler:
             for c in self.feature_names_in_
         )
 
+    def _run_one(self, c: str) -> nw.Expr:
+        expr = nw.col(c)
+
+        return expr.__sub__(expr.median()).__truediv__(
+            expr.quantile(self.quantile_range[1], interpolation="linear").__sub__(
+                expr.quantile(self.quantile_range[0], interpolation="linear")
+            )
+        )
+
     @nw.narwhalify
     def run(
         self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
     ) -> nwt.IntoFrameT:
-        selector = _lazy_resolve_columns(columns)
-
-        return X.select(
-            selector.__sub__(selector.median()).__truediv__(
-                selector.quantile(
-                    self.quantile_range[1], interpolation="linear"
-                ).__sub__(
-                    selector.quantile(self.quantile_range[0], interpolation="linear")
-                )
-            )
-        )
+        return X.with_columns(self._run_one(c) for c in _resolve_columns(X, columns))
 
     def save(self, path: PathLike):
         with zipfile.ZipFile(
