@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import narwhals.stable.v1 as nw
-import narwhals.stable.v1.selectors as nws
 import narwhals.typing as nwt
 import polars as pl
 
@@ -231,7 +230,7 @@ class StandardScaler:
 
     @nw.narwhalify
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
+        return X.with_columns(
             nw.col(c).__sub__(self.mean_[c]).__truediv__(self.std_[c])
             for c in self.feature_names_in_
         )
@@ -244,7 +243,7 @@ class StandardScaler:
 
     @nw.narwhalify
     def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
+        return X.with_columns(
             nw.col(c).__mul__(self.std_[c]).__add__(self.mean_[c])
             for c in self.feature_names_in_
         )
@@ -319,7 +318,7 @@ class RobustScaler:
 
     @nw.narwhalify
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
+        return X.with_columns(
             nw.col(c).__sub__(self.median_[c]).__truediv__(self.scale_[c])
             for c in self.feature_names_in_
         )
@@ -332,7 +331,7 @@ class RobustScaler:
 
     @nw.narwhalify
     def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return X.select(
+        return X.with_columns(
             nw.col(c).__mul__(self.scale_[c]).__add__(self.median_[c])
             for c in self.feature_names_in_
         )
