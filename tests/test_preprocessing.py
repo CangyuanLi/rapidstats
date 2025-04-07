@@ -24,12 +24,7 @@ DATA = (
         for i, c in enumerate(cols)
     )
     .with_columns(
-        pl.when(pl.col(f"prob_{c}").gt(0.9))
-        .then(None)
-        .when(pl.col(f"prob_{c}").lt(0.1))
-        .then(float("nan"))
-        .otherwise(pl.col(c))
-        .alias(c)
+        pl.when(pl.col(f"prob_{c}").gt(0.9)).then(None).otherwise(pl.col(c)).alias(c)
         for c in cols
     )
     .drop(cs.starts_with("prob_"))
