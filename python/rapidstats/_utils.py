@@ -3,23 +3,10 @@ import multiprocessing
 from typing import Literal, Union
 
 import polars as pl
-from polars.interchange.protocol import SupportsInterchange
 from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
-DataFrame = Union[pl.DataFrame, SupportsInterchange]
 PolarsFrame = Union[pl.LazyFrame, pl.DataFrame]
-
-
-def _to_polars(df: DataFrame) -> pl.DataFrame:
-    if isinstance(df, pl.DataFrame):
-        return df
-    elif hasattr(df, "to_polars"):
-        return df.to_polars()
-    elif hasattr(df, "__dataframe__"):
-        return pl.from_dataframe(df)
-    else:
-        raise ValueError("Input must be convertible to a Polars DataFrame")
 
 
 def _regression_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
