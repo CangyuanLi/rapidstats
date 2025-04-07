@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import json
 import tempfile
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import narwhals as nw
 import narwhals.selectors as nws
@@ -10,17 +13,6 @@ import narwhals.typing as nwt
 import polars as pl
 
 PathLike = Union[str, Path]
-
-
-def _read_list(path: PathLike) -> list:
-    with open(path) as f:
-        return [x.strip() for x in f.readlines()]
-
-
-def _write_list(lst: list, path: PathLike):
-    with open(path, "w") as f:
-        for x in lst:
-            f.write(f"{x}\n")
 
 
 def _read_json(path: PathLike) -> dict:
@@ -31,6 +23,26 @@ def _read_json(path: PathLike) -> dict:
 def _write_json(obj, path: PathLike):
     with open(path, "w") as f:
         json.dump(obj, f)
+
+
+def _resolve_columns(
+    X: nwt.DataFrame, columns: Optional[str | Iterable[str]]
+) -> Iterable[str]:
+    if columns is None:
+        return X.columns
+    elif isinstance(columns, str):
+        return [columns]
+    else:
+        return columns
+
+
+def _lazy_resolve_columns(
+    columns: Optional[str | Iterable[str]],
+) -> nws.Selector | nw.Expr:
+    if columns is None:
+        return nws.all()
+    else:
+        return nw.col(columns)
 
 
 class MinMaxScaler:
@@ -55,7 +67,7 @@ class MinMaxScaler:
 
         return self
 
-    def fit(self, X: nwt.IntoDataFrameT):
+    def fit(self, X: nwt.IntoDataFrameT, columns: Optional[str | Iterable[str]] = None):
         """_summary_
 
         Parameters
@@ -76,9 +88,9 @@ class MinMaxScaler:
         """
         X = nw.from_native(X, eager_only=True)
 
-        self.feature_names_in_ = X.columns
-        data_min = X.select(nws.all().min())
-        data_max = X.select(nws.all().max())
+        self.feature_names_in_ = _resolve_columns(X, columns)
+        data_min = X.select(nw.col(self.feature_names_in_).min())
+        data_max = X.select(nw.col(self.feature_names_in_).max())
         data_range: nwt.DataFrameT = data_max.select(
             nw.col(c).__sub__(data_min[c]) for c in self.feature_names_in_
         )
@@ -107,11 +119,14 @@ class MinMaxScaler:
         return self.fit(X).transform(X)
 
     @nw.narwhalify
-    def run(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+    def run(
+        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoFrameT:
+        selector = _lazy_resolve_columns(columns)
+
         return X.select(
-            nws.all()
-            .__sub__(nws.all().min())
-            .__truediv__(nws.all().max().__sub__(nws.all().min()))
+            selector.__sub__(selector.min())
+            .__truediv__(selector.max().__sub__(selector.min()))
             .__mul__(self._range_diff)
             .__add__(self._range_min)
         )
@@ -209,12 +224,13 @@ class StandardScaler:
     def __init__(self, ddof: int = 1):
         self.ddof = ddof
 
-    def fit(self, X: nwt.IntoDataFrame):
+    def fit(self, X: nwt.IntoDataFrame, columns: Optional[str | Iterable[str]] = None):
         X = nw.from_native(X, eager_only=True)
+        self.feature_names_in_ = _resolve_columns(X, columns)
+        selector = nw.col(self.feature_names_in_)
 
-        self.mean_ = X.select(nws.all().mean())
-        self.std_ = X.select(nws.all().std(ddof=self.ddof))
-        self.feature_names_in_ = X.columns
+        self.mean_ = X.select(selector.mean())
+        self.std_ = X.select(selector.std(ddof=self.ddof))
 
         return self
 
@@ -226,8 +242,10 @@ class StandardScaler:
         )
 
     @nw.narwhalify
-    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
-        return self.fit(X).transform(X)
+    def fit_transform(
+        self, X: nwt.IntoDataFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoDataFrameT:
+        return self.fit(X, columns=columns).transform(X)
 
     @nw.narwhalify
     def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
@@ -237,11 +255,13 @@ class StandardScaler:
         )
 
     @nw.narwhalify
-    def run(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+    def run(
+        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoFrameT:
+        selector = _lazy_resolve_columns(columns)
+
         return X.select(
-            nws.all()
-            .__sub__(nws.all().mean())
-            .__truediv__(nws.all().std(ddof=self.ddof))
+            selector.__sub__(selector.mean()).__truediv__(selector.std(ddof=self.ddof))
         )
 
     def save(self, path: PathLike):
@@ -285,14 +305,17 @@ class RobustScaler:
     def __init__(self, quantile_range: tuple[float, float] = (0.25, 0.75)):
         self.quantile_range = quantile_range
 
-    @nw.narwhalify
-    def fit(self, X: nwt.IntoDataFrame):
-        self.feature_names_in_ = X.columns
-        self.median_ = X.select(nws.all().median())
+    def fit(self, X: nwt.IntoDataFrame, columns: Optional[Iterable[str]] = None):
+        X = nw.from_native(X, eager_only=True)
+
+        self.feature_names_in_ = _resolve_columns(X, columns)
+        selector = nw.col(self.feature_names_in_)
+
+        self.median_ = X.select(selector.median())
         self.scale_ = X.select(
-            nws.all()
-            .quantile(self.quantile_range[1], interpolation="linear")
-            .__sub__(nws.all().quantile(self.quantile_range[0], interpolation="linear"))
+            selector.quantile(self.quantile_range[1], interpolation="linear").__sub__(
+                selector.quantile(self.quantile_range[0], interpolation="linear")
+            )
         )
 
         return self
@@ -305,8 +328,10 @@ class RobustScaler:
         )
 
     @nw.narwhalify
-    def fit_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
-        return self.fit(X).transform(X)
+    def fit_transform(
+        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoFrameT:
+        return self.fit(X, columns=columns).transform(X)
 
     @nw.narwhalify
     def inverse_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
@@ -316,15 +341,17 @@ class RobustScaler:
         )
 
     @nw.narwhalify
-    def run(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+    def run(
+        self, X: nwt.IntoFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoFrameT:
+        selector = _lazy_resolve_columns(columns)
+
         return X.select(
-            nws.all()
-            .__sub__(nws.all().median())
-            .__truediv__(
-                nws.all()
-                .quantile(self.quantile_range[1], interpolation="linear")
-                .__sub__(
-                    nws.all().quantile(self.quantile_range[0], interpolation="linear")
+            selector.__sub__(selector.median()).__truediv__(
+                selector.quantile(
+                    self.quantile_range[1], interpolation="linear"
+                ).__sub__(
+                    selector.quantile(self.quantile_range[0], interpolation="linear")
                 )
             )
         )
@@ -380,10 +407,12 @@ class OneHotEncoder:
     def __init__(self):
         pass
 
-    def fit(self, X: nwt.IntoDataFrameT):
+    def fit(self, X: nwt.IntoDataFrameT, columns: Optional[str | Iterable[str]] = None):
         X = nw.from_native(X, eager_only=True)
 
-        self.categories_ = {c: X[c].drop_nulls().unique() for c in X.columns}
+        self.categories_ = {
+            c: X[c].drop_nulls().unique() for c in _resolve_columns(X, columns)
+        }
 
         return self
 
@@ -396,8 +425,10 @@ class OneHotEncoder:
         return X
 
     @nw.narwhalify
-    def fit_transform(self, X: nwt.IntoDataFrameT) -> nwt.IntoDataFrameT:
-        return self.fit(X).transform(X)
+    def fit_transform(
+        self, X: nwt.IntoDataFrameT, columns: Optional[str | Iterable[str]] = None
+    ) -> nwt.IntoDataFrameT:
+        return self.fit(X, columns=columns).transform(X)
 
     def save(self, path: PathLike):
         with zipfile.ZipFile(
