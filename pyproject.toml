@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = ["polars>=1.0.0", "narwhals>=1.0.0", "tqdm"]
+dependencies = ["polars>=1.0.0,!=1.26.0", "narwhals>=1.0.0", "tqdm"]
 
 [project.optional-dependencies]
 pyarrow = ["pyarrow >= 7.0.0"]
