@@ -1,4 +1,4 @@
-from rapidstats import metrics, polars, preprocessing
+from rapidstats import metrics, polars, preprocessing, selection
 
 from ._bootstrap import Bootstrap
 from ._corr import correlation_matrix
