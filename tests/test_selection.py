@@ -21,6 +21,41 @@ N_ROWS = 50_000
 SEED = 208
 N_ESTIMATORS = 10
 
+ESTIMATORS = [
+    catboost.CatBoostClassifier(
+        iterations=N_ESTIMATORS,
+        verbose=False,
+        random_state=SEED,
+        allow_writing_files=False,
+    ),
+    lightgbm.LGBMClassifier(
+        n_estimators=N_ESTIMATORS,
+        random_state=SEED,
+        verbose=-1,
+        importance_type="gain",
+    ),
+    xgboost.XGBClassifier(n_estimators=N_ESTIMATORS, random_state=SEED, verbosity=0),
+    GradientBoostingClassifier(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
+    RandomForestClassifier(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
+    catboost.CatBoostRegressor(
+        iterations=N_ESTIMATORS,
+        verbose=False,
+        random_state=SEED,
+        allow_writing_files=False,
+    ),
+    lightgbm.LGBMRegressor(
+        n_estimators=N_ESTIMATORS,
+        random_state=SEED,
+        verbose=-1,
+        importance_type="gain",
+    ),
+    xgboost.XGBRegressor(n_estimators=N_ESTIMATORS, random_state=SEED, verbosity=0),
+    GradientBoostingRegressor(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
+    RandomForestRegressor(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
+    LinearRegression(),
+    LogisticRegression(random_state=SEED),
+]
+
 np.random.seed(SEED)
 
 
@@ -48,49 +83,7 @@ X = pl.DataFrame(
 ).to_pandas()
 
 
-@pytest.mark.parametrize(
-    "estimator",
-    [
-        catboost.CatBoostClassifier(
-            iterations=N_ESTIMATORS,
-            verbose=False,
-            random_state=SEED,
-            allow_writing_files=False,
-        ),
-        lightgbm.LGBMClassifier(
-            n_estimators=N_ESTIMATORS,
-            random_state=SEED,
-            verbose=-1,
-            importance_type="gain",
-        ),
-        xgboost.XGBClassifier(
-            n_estimators=N_ESTIMATORS, random_state=SEED, verbosity=0
-        ),
-        GradientBoostingClassifier(
-            n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0
-        ),
-        RandomForestClassifier(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
-        catboost.CatBoostRegressor(
-            iterations=N_ESTIMATORS,
-            verbose=False,
-            random_state=SEED,
-            allow_writing_files=False,
-        ),
-        lightgbm.LGBMRegressor(
-            n_estimators=N_ESTIMATORS,
-            random_state=SEED,
-            verbose=-1,
-            importance_type="gain",
-        ),
-        xgboost.XGBRegressor(n_estimators=N_ESTIMATORS, random_state=SEED, verbosity=0),
-        GradientBoostingRegressor(
-            n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0
-        ),
-        RandomForestRegressor(n_estimators=N_ESTIMATORS, random_state=SEED, verbose=0),
-        LinearRegression(),
-        LogisticRegression(random_state=SEED),
-    ],
-)
+@pytest.mark.parametrize("estimator", ESTIMATORS)
 def test_rfe(estimator):
     fit_kwargs = {}
     if "eval_set" in inspect.signature(estimator.fit).parameters:
@@ -100,4 +93,15 @@ def test_rfe(estimator):
         X, y, **fit_kwargs
     )
 
-    assert rfe.feature_names_in_ == ["f0.99"]
+    assert rfe.selected_features_ == ["f0.99"]
+
+
+@pytest.mark.parametrize("estimator", ESTIMATORS)
+def test_nfe(estimator):
+    fit_kwargs = {}
+    if "eval_set" in inspect.signature(estimator.fit).parameters:
+        fit_kwargs["eval_set"] = [(X, y)]
+
+    nfe = rs.selection.NFE(estimator=estimator).fit(X, y, **fit_kwargs)
+
+    assert "f0.99" in nfe.selected_features_

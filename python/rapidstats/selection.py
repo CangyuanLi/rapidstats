@@ -11,13 +11,14 @@ from typing import Any, Callable, Literal, Optional, Protocol, TypedDict
 import narwhals.stable.v1 as nw
 import narwhals.stable.v1.typing as nwt
 import polars as pl
+from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
 from .metrics import roc_auc
 
 
 class Estimator(Protocol):
-    def fit(self, X, y, eval_set, **kwargs): ...
+    def fit(self, X, y, **kwargs): ...
 
 
 def _copy(estimator: Estimator):
@@ -135,9 +136,7 @@ class RFEState(TypedDict):
     iteration: int
 
 
-def _get_feature_importance(rfe_state: RFEState) -> pl.Series:
-    est = rfe_state["estimator"]
-
+def _get_feature_importance(est):
     if hasattr(est, "feature_importances_"):
         importances = est.feature_importances_
     elif hasattr(est, "coef_"):
@@ -146,9 +145,14 @@ def _get_feature_importance(rfe_state: RFEState) -> pl.Series:
         raise AttributeError("Could not find either `feature_importances_` or `coef_`.")
 
     if hasattr(importances, "ravel"):
-        importances = importances.ravel()
+        if callable(importances.ravel):
+            importances = importances.ravel()
 
     return importances
+
+
+def _rfe_get_feature_importance(rfe_state: RFEState) -> ArrayLike:
+    return _get_feature_importance(rfe_state["estimator"])
 
 
 class RFE:
@@ -157,7 +161,7 @@ class RFE:
         estimator: Estimator,
         n_features_to_select: float = 1,
         step: float = 1,
-        importance: Callable[[RFEState], Iterable[float]] = _get_feature_importance,
+        importance: Callable[[RFEState], Iterable[float]] = _rfe_get_feature_importance,
         callbacks: Optional[Iterable[Callable[[RFEState]]]] = None,
         quiet: bool = False,
     ):
@@ -256,6 +260,133 @@ class RFE:
                 pbar.update(1)
 
         self.estimator_ = est
-        self.feature_names_in_ = features
+        self.selected_features_ = features
 
         return self
+
+    def transform(
+        self,
+        X: Optional[nwt.IntoDataFrame] = None,
+        y: Optional[Any] = None,
+        **fit_kwargs,
+    ) -> Any:
+        if X is None or y is None:
+            return self.estimator_
+
+        if "eval_set" in fit_kwargs:
+            fit_kwargs["eval_set"] = [
+                (
+                    nw.from_native(X_val).select(self.selected_features_).to_native(),
+                    y_val,
+                )
+                for X_val, y_val in fit_kwargs["eval_set"]
+            ]
+
+        return self.unfit_estimator.fit(
+            nw.from_native(X, eager_only=True)
+            .select(self.selected_features_)
+            .to_native(),
+            y,
+            **fit_kwargs,
+        )
+
+    def fit_transform(self, X, y, **fit_kwargs) -> Any:
+        return self.fit(X, y, **fit_kwargs).transform()
+
+
+class NFEState(TypedDict):
+    estimator: Estimator
+    X: Any
+    y: Any
+
+
+def _nfe_get_feature_importance(nfe_state: NFEState) -> ArrayLike:
+    return _get_feature_importance(nfe_state["estimator"])
+
+
+class NFE:
+    _NOISE_COL = "__rapidstats_nfe_random_noise__"
+
+    def __init__(
+        self,
+        estimator: Estimator,
+        importance: Callable[[NFEState], ArrayLike] = _nfe_get_feature_importance,
+    ):
+        self.unfit_estimator = estimator
+        self.importance = importance
+
+    def _add_noise(self, df: nw.DataFrame) -> nw.DataFrame:
+        noise_col = self._NOISE_COL
+
+        n_rows = df.shape[0]
+
+        return df.with_row_index(noise_col).with_columns(
+            nw.col(noise_col)
+            .sample(n_rows, with_replacement=True)
+            .__truediv__(n_rows)
+            .alias(noise_col)
+        )
+
+    def fit(self, X: nwt.IntoDataFrame, y: Any, **fit_kwargs):
+
+        X_nw = nw.from_native(X, eager_only=True).pipe(self._add_noise)
+
+        if "eval_set" in fit_kwargs:
+            fit_kwargs["eval_set"] = [
+                (
+                    nw.from_native(x_val, eager_only=True)
+                    .pipe(self._add_noise)
+                    .to_native(),
+                    y_val,
+                )
+                for x_val, y_val in fit_kwargs["eval_set"]
+            ]
+
+        X_train = X_nw.to_native()
+        est = self.unfit_estimator.fit(X_train, y, **fit_kwargs)
+
+        state = {"estimator": est, "X": X_train, "y": y}
+
+        nfe_features = (
+            pl.LazyFrame(
+                {"feature": X_train.columns, "importance": self.importance(state)}
+            )
+            .with_columns(pl.col("importance").abs())
+            .filter(
+                pl.col("importance").gt(
+                    pl.col("importance").filter(pl.col("feature").eq(self._NOISE_COL))
+                )
+            )
+            .collect()["feature"]
+            .to_list()
+        )
+
+        self.selected_features_ = nfe_features
+
+        return self
+
+    def transform(
+        self,
+        X: nwt.IntoDataFrame,
+        y: Any,
+        **fit_kwargs,
+    ) -> Any:
+        if "eval_set" in fit_kwargs:
+            fit_kwargs["eval_set"] = [
+                (
+                    nw.from_native(X_val).select(self.selected_features_).to_native(),
+                    y_val,
+                )
+                for X_val, y_val in fit_kwargs["eval_set"]
+            ]
+
+        return self.unfit_estimator.fit(
+            nw.from_native(X, eager_only=True)
+            .select(self.selected_features_)
+            .to_native(),
+            y,
+            **fit_kwargs,
+        )
+
+    def fit_transform(self, X: nwt.IntoDataFrame, y: Any, **fit_kwargs) -> Any:
+        return self.fit(X, y, **fit_kwargs).transform(X, y, **fit_kwargs)
