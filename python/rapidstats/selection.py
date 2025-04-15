@@ -328,9 +328,11 @@ class NFE:
         self,
         estimator: Estimator,
         importance: Callable[[NFEState], ArrayLike] = _nfe_get_feature_importance,
+        seed: Optional[int] = None,
     ):
         self.unfit_estimator = estimator
         self.importance = importance
+        self.seed = seed
 
     def _add_noise(self, df: nw.DataFrame) -> nw.DataFrame:
         noise_col = self._NOISE_COL
@@ -339,7 +341,7 @@ class NFE:
 
         return df.with_row_index(noise_col).with_columns(
             nw.col(noise_col)
-            .sample(n_rows, with_replacement=True)
+            .sample(n_rows, with_replacement=True, seed=self.seed)
             .__truediv__(n_rows)
             .alias(noise_col)
         )
