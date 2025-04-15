@@ -31,12 +31,6 @@ def _copy(estimator: Estimator):
     return copy.deepcopy(estimator)
 
 
-class EarlyStoppingProtocol(Protocol):
-    def stop(self) -> bool: ...
-
-    def __call__(self, *args, **kwargs): ...
-
-
 def _roc_auc(est, X, y) -> float:
     y_score = est.predict_proba(X)[:, 0]
 
@@ -44,6 +38,8 @@ def _roc_auc(est, X, y) -> float:
 
 
 class EarlyStopping:
+    """A callback that activates early stopping."""
+
     def __init__(
         self,
         X: Optional[Any] = None,
@@ -52,6 +48,25 @@ class EarlyStopping:
         max_delta: float = 0.1,
         direction: Literal["maximize", "minimize"] = "maximize",
     ):
+        """_summary_
+
+        Parameters
+        ----------
+        X : Optional[Any], optional
+            The evaluation dataset the model should predict. If None, it will first
+            look for the existence of an `eval_set` parameter. If `eval_set` is not
+            available, it will use the training data, by default None
+        y : Optional[Any], optional
+            The evaluation ground truth target, by default None
+        metric : Callable[[Estimator, Any, Any], float], optional
+            A callable that takes in the estimator, `X`, `y` and returns a float,
+            by default _roc_auc
+        max_delta : float, optional
+            The maximum difference between the best iteration and the worst iteration
+            before stopping, by default 0.1
+        direction : Literal["maximize", "minimize"], optional
+            Whether the metric should be maximized or minimized, by default "maximize"
+        """
         self.X = X
         self.y = y
         self.metric_func = metric
@@ -128,6 +143,8 @@ def _get_max_iterations(n_features: int, n_features_to_select: int, step: float)
 
 
 class RFEState(TypedDict):
+    """The state at each RFE iteration"""
+
     estimator: Estimator
     X: Any
     y: Any
