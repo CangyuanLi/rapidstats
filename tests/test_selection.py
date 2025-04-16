@@ -102,6 +102,6 @@ def test_nfe(estimator):
     if "eval_set" in inspect.signature(estimator.fit).parameters:
         fit_kwargs["eval_set"] = [(X, y)]
 
-    nfe = rs.selection.NFE(estimator=estimator).fit(X, y, **fit_kwargs)
+    nfe = rs.selection.NFE(estimator=estimator, seed=SEED).fit(X, y, **fit_kwargs)
 
     assert "f0.99" in nfe.selected_features_
