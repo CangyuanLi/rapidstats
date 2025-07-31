@@ -715,6 +715,11 @@ class Bootstrap:
             Ground truth target
         y_score : ArrayLike
             Predicted scores
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
 
         Returns
         -------
@@ -745,6 +750,11 @@ class Bootstrap:
             Ground truth target
         y_score : ArrayLike
             Predicted scores
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
 
         Returns
         -------
