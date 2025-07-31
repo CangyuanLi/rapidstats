@@ -494,6 +494,7 @@ class Bootstrap:
         y_true: ArrayLike,
         y_pred: ArrayLike,
         beta: float = 1.0,
+        sample_weight: Optional[ArrayLike] = None,
     ) -> BootstrappedConfusionMatrix:
         r"""Bootstrap confusion matrix. See [rapidstats.metrics.confusion_matrix][] for
         more details.
@@ -506,6 +507,11 @@ class Bootstrap:
             Predicted target
         beta : float, optional
             \( \beta \) to use in \( F_\beta \), by default 1
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
 
         Returns
         -------
@@ -516,7 +522,7 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_pred_to_df(y_true, y_pred)
+        df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
 
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(df, beta, **self._params)
@@ -530,6 +536,7 @@ class Bootstrap:
         metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
         strategy: LoopStrategy = "auto",
         beta: float = 1.0,
+        sample_weight: Optional[ArrayLike] = None,
     ) -> pl.DataFrame:
         r"""Bootstrap confusion matrix at thresholds. See
         [rapidstats.metrics.confusion_matrix_at_thresholds][] for more details.
@@ -549,6 +556,11 @@ class Bootstrap:
             Computation method, by default "auto"
         beta : float, optional
             \( \beta \) to use in \( F_\beta \), by default 1
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
 
         Returns
         -------
@@ -563,7 +575,9 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_score_to_df(y_true, y_score).rename({"y_score": "threshold"})
+        df = _y_true_y_score_to_df(y_true, y_score, sample_weight).rename(
+            {"y_score": "threshold"}
+        )
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
         strategy = _set_loop_strategy(thresholds, strategy)
@@ -573,7 +587,10 @@ class Bootstrap:
             for t in tqdm(set(thresholds or y_score)):
                 cm = (
                     self.confusion_matrix(
-                        df["y_true"], df["threshold"].ge(t), beta=beta
+                        df["y_true"],
+                        df["threshold"].ge(t),
+                        beta=beta,
+                        sample_weight=df["sample_weight"],
                     )
                     .to_polars()
                     .with_columns(pl.lit(t).alias("threshold"))
@@ -688,6 +705,7 @@ class Bootstrap:
         self,
         y_true: ArrayLike,
         y_score: ArrayLike,
+        sample_weight: Optional[ArrayLike] = None,
     ) -> ConfidenceInterval:
         """Bootstrap ROC-AUC. See [rapidstats.metrics.roc_auc][] for more details.
 
@@ -706,14 +724,17 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_score_to_df(y_true, y_score).with_columns(
+        df = _y_true_y_score_to_df(y_true, y_score, sample_weight).with_columns(
             pl.col("y_true").cast(pl.Float64)
         )
 
         return _bootstrap_roc_auc(df, **self._params)
 
     def average_precision(
-        self, y_true: ArrayLike, y_score: ArrayLike
+        self,
+        y_true: ArrayLike,
+        y_score: ArrayLike,
+        sample_weight: Optional[ArrayLike] = None,
     ) -> ConfidenceInterval:
         """Bootstrap average precision. See [rapidstats.metrics.average_precision][] for more
         details.
@@ -734,7 +755,7 @@ class Bootstrap:
         ----------------------
         """
         df = (
-            _y_true_y_score_to_df(y_true, y_score)
+            _y_true_y_score_to_df(y_true, y_score, sample_weight)
             .rename({"y_score": "threshold"})
             .drop_nulls()
         )
