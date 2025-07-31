@@ -20,6 +20,7 @@ def _regression_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
 def _y_true_y_score_to_df(
     y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
 ) -> pl.DataFrame:
+    """`y_true` as boolean, `y_score` and `sample_weight` as float64, nulls dropped"""
     return (
         pl.DataFrame(
             {

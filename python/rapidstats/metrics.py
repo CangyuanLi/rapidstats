@@ -188,6 +188,11 @@ def confusion_matrix(
         Predicted target
     beta : float, optional
         \( \beta \) to use in \( F_\beta \), by default 1
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -213,6 +218,11 @@ def roc_auc(
         Ground truth target
     y_score : ArrayLike
         Predicted scores
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -782,6 +792,11 @@ def confusion_matrix_at_thresholds(
         Computation method, by default "auto"
     beta : float, optional
         \( \beta \) to use in \( F_\beta \), by default 1
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -844,7 +859,9 @@ def _ap_from_pr_curve(precision: pl.Expr, recall: pl.Expr) -> pl.Expr:
     )
 
 
-def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
+def average_precision(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> float:
     """Computes Average Precision.
 
     Parameters
@@ -853,6 +870,11 @@ def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Ground truth target
     y_score : ArrayLike
         Predicted scores
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -863,9 +885,8 @@ def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
     ----------------------
     """
     return (
-        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
-        .with_columns(pl.col("y_true").cast(pl.Boolean))
-        .drop_nulls()
+        _y_true_y_score_to_df(y_true, y_score, sample_weight)
+        .rename({"y_score": "threshold"})
         .pipe(_base_confusion_matrix_at_thresholds)
         .pipe(_full_confusion_matrix_from_base)
         .select("threshold", "precision", "tpr")
