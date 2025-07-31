@@ -1,6 +1,6 @@
 import concurrent.futures
 import multiprocessing
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 import polars as pl
 from polars.series.series import ArrayLike
@@ -17,20 +17,41 @@ def _regression_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
     )
 
 
-def _y_true_y_score_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
+def _y_true_y_score_to_df(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> pl.DataFrame:
+    """`y_true` as boolean, `y_score` and `sample_weight` as float64, nulls dropped"""
     return (
-        pl.DataFrame({"y_true": y_true, "y_score": y_score})
+        pl.DataFrame(
+            {
+                "y_true": y_true,
+                "y_score": y_score,
+                "sample_weight": 1.0 if sample_weight is None else sample_weight,
+            }
+        )
         .with_columns(
-            pl.col("y_true").cast(pl.Boolean), pl.col("y_score").cast(pl.Float64)
+            pl.col("y_true").cast(pl.Boolean),
+            pl.col("y_score", "sample_weight").cast(pl.Float64),
         )
         .drop_nulls()
     )
 
 
-def _y_true_y_pred_to_df(y_true: ArrayLike, y_pred: ArrayLike) -> pl.DataFrame:
+def _y_true_y_pred_to_df(
+    y_true: ArrayLike, y_pred: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> pl.DataFrame:
     return (
-        pl.DataFrame({"y_true": y_true, "y_pred": y_pred})
-        .with_columns(pl.col("y_true", "y_pred").cast(pl.Boolean))
+        pl.DataFrame(
+            {
+                "y_true": y_true,
+                "y_pred": y_pred,
+                "sample_weight": (1.0 if sample_weight is None else sample_weight),
+            }
+        )
+        .select(
+            pl.col("y_true", "y_pred").cast(pl.Boolean),
+            pl.col("sample_weight").cast(pl.Float64),
+        )
         .drop_nulls()
     )
 

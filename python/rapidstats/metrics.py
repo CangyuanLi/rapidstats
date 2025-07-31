@@ -173,7 +173,10 @@ class ConfusionMatrix:
 
 
 def confusion_matrix(
-    y_true: ArrayLike, y_pred: ArrayLike, beta: float = 1.0
+    y_true: ArrayLike,
+    y_pred: ArrayLike,
+    beta: float = 1.0,
+    sample_weight: Optional[ArrayLike] = None,
 ) -> ConfusionMatrix:
     r"""Computes confusion matrix metrics (TP, FP, TN, FN, TPR, Fbeta, etc.).
 
@@ -185,6 +188,11 @@ def confusion_matrix(
         Predicted target
     beta : float, optional
         \( \beta \) to use in \( F_\beta \), by default 1
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -194,12 +202,14 @@ def confusion_matrix(
     Added in version 0.1.0
     ----------------------
     """
-    df = _y_true_y_pred_to_df(y_true, y_pred)
+    df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
 
     return ConfusionMatrix(*_confusion_matrix(df, beta))
 
 
-def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
+def roc_auc(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> float:
     """Computes Area Under the Receiver Operating Characteristic Curve.
 
     Parameters
@@ -208,6 +218,11 @@ def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Ground truth target
     y_score : ArrayLike
         Predicted scores
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -217,7 +232,7 @@ def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
     Added in version 0.1.0
     ----------------------
     """
-    df = _y_true_y_score_to_df(y_true, y_score).with_columns(
+    df = _y_true_y_score_to_df(y_true, y_score, sample_weight).with_columns(
         pl.col("y_true").cast(pl.Float64)
     )
 
@@ -589,19 +604,36 @@ def _set_loop_strategy(
 
 
 def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+    """Compute basic confusion matrix.
+
+    Parameters
+    ----------
+    pf : PolarsFrame
+        Needs `y_true`, `threshold`, and `sample_weight`
+
+    Returns
+    -------
+    PolarsFrame
+        A frame of `threshold`, `tn`, `fp`, `fn`, and `tp`
+    """
     return (
         pf.sort("threshold", descending=True)
         .with_columns(
-            pl.col("y_true").cum_sum().alias("tp"),
-            pl.col("y_true").not_().cum_sum().alias("fp"),
+            (pl.col("y_true") * pl.col("sample_weight")).cum_sum().alias("tp"),
+            (pl.col("y_true").not_() * pl.col("sample_weight")).cum_sum().alias("fp"),
         )
         .with_columns(
             pl.col("tp").tail(1).first().alias("total_positives"),
         )
-        .with_columns(pl.len().sub(pl.col("total_positives")).alias("total_negatives"))
+        .with_columns(
+            pl.col("sample_weight")
+            .sum()
+            .sub(pl.col("total_positives"))
+            .alias("total_negatives")
+        )
         .with_columns(
             pl.col("total_positives").sub(pl.col("tp")).alias("fn"),
-            pl.col("total_negatives").sub(pl.col("fp")).alias("tn"),
+            pl.col("total_negatives").sub(pl.col("fp")).round(12).alias("tn"),
         )
         .with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
@@ -732,6 +764,7 @@ def confusion_matrix_at_thresholds(
     metrics: Iterable[ConfusionMatrixMetric] = DefaultConfusionMatrixMetrics,
     strategy: LoopStrategy = "auto",
     beta: float = 1.0,
+    sample_weight: Optional[ArrayLike] = None,
 ) -> pl.DataFrame:
     r"""Computes the confusion matrix at each threshold. When the `strategy` is
     "cum_sum", computes
@@ -759,6 +792,11 @@ def confusion_matrix_at_thresholds(
         Computation method, by default "auto"
     beta : float, optional
         \( \beta \) to use in \( F_\beta \), by default 1
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -775,7 +813,12 @@ def confusion_matrix_at_thresholds(
 
         def _cm(t):
             return (
-                confusion_matrix(df["y_true"], df["y_score"].ge(t), beta=beta)
+                confusion_matrix(
+                    df["y_true"],
+                    df["y_score"].ge(t),
+                    beta=beta,
+                    sample_weight=sample_weight,
+                )
                 .to_polars()
                 .with_columns(pl.lit(t).alias("threshold"))
             )
@@ -785,7 +828,13 @@ def confusion_matrix_at_thresholds(
         return pl.concat(cms, how="vertical").fill_nan(None)
     elif strategy == "cum_sum":
         return (
-            pl.LazyFrame({"y_true": y_true, "threshold": y_score})
+            pl.LazyFrame(
+                {
+                    "y_true": y_true,
+                    "threshold": y_score,
+                    "sample_weight": 1.0 if sample_weight is None else sample_weight,
+                }
+            )
             .with_columns(pl.col("y_true").cast(pl.Boolean))
             .drop_nulls()
             .pipe(_base_confusion_matrix_at_thresholds)
@@ -810,7 +859,9 @@ def _ap_from_pr_curve(precision: pl.Expr, recall: pl.Expr) -> pl.Expr:
     )
 
 
-def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
+def average_precision(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> float:
     """Computes Average Precision.
 
     Parameters
@@ -819,6 +870,11 @@ def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
         Ground truth target
     y_score : ArrayLike
         Predicted scores
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -829,9 +885,9 @@ def average_precision(y_true: ArrayLike, y_score: ArrayLike) -> float:
     ----------------------
     """
     return (
-        pl.LazyFrame({"y_true": y_true, "threshold": y_score})
-        .with_columns(pl.col("y_true").cast(pl.Boolean))
-        .drop_nulls()
+        _y_true_y_score_to_df(y_true, y_score, sample_weight)
+        .lazy()
+        .rename({"y_score": "threshold"})
         .pipe(_base_confusion_matrix_at_thresholds)
         .pipe(_full_confusion_matrix_from_base)
         .select("threshold", "precision", "tpr")

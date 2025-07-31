@@ -7,27 +7,31 @@ pub type ConfusionMatrixArray = [f64; 27];
 
 pub fn base_confusion_matrix(df: DataFrame) -> DataFrame {
     df.lazy()
-        .select([(lit(2) * col("y_true") + col("y_pred")).alias("y")])
+        .select([
+            (lit(2) * col("y_true") + col("y_pred")).alias("y"),
+            col("sample_weight"),
+        ])
         .collect()
         .unwrap()
 }
 
 pub fn confusion_matrix(base_cm: DataFrame, beta: f64) -> ConfusionMatrixArray {
-    let mut s = [0u32; 4];
-    for i in base_cm["y"]
+    let mut s = [0.0; 4];
+    for (i, w) in base_cm["y"]
         .cast(&DataType::UInt64)
         .unwrap()
         .u64()
         .unwrap()
         .into_no_null_iter()
+        .zip(base_cm["sample_weight"].f64().unwrap().into_no_null_iter())
     {
-        s[i as usize] += 1;
+        s[i as usize] += w;
     }
 
-    let tn = s[0] as f64;
-    let fp = s[1] as f64;
-    let fn_ = s[2] as f64;
-    let tp = s[3] as f64;
+    let tn = s[0];
+    let fp = s[1];
+    let fn_ = s[2];
+    let tp = s[3];
 
     let p = tp + fn_;
     let n = fp + tn;
@@ -158,17 +162,34 @@ pub fn bootstrap_confusion_matrix(
 pub fn roc_auc(df: DataFrame) -> f64 {
     let df = df.sort(["y_score"], Default::default()).unwrap();
     let y_true = df["y_true"].f64().unwrap();
+    let sample_weight = df["sample_weight"].f64().unwrap();
 
-    let n = y_true.len() as f64;
-    let (auc, nfalse) = y_true
+    let (auc, n_false) = y_true
         .into_no_null_iter()
-        .fold((0.0, 0.0), |(auc, nfalse), y_i| {
-            let new_nfalse = nfalse + (1.0 - y_i);
-            let new_auc = auc + y_i * new_nfalse;
-            (new_auc, new_nfalse)
+        .zip(sample_weight.into_no_null_iter())
+        .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
+            let new_n_false = n_false + (1.0 - y_i) * w_i;
+            let new_auc = auc + y_i * w_i * new_n_false;
+            (new_auc, new_n_false)
         });
 
-    auc / (nfalse * (n - nfalse))
+    let n_true = y_true
+        .into_no_null_iter()
+        .zip(sample_weight.into_no_null_iter())
+        .fold(0.0, |acc, (y_i, w_i)| acc + y_i * w_i);
+
+    auc / (n_false * n_true)
+
+    // let n = y_true.len() as f64;
+    // let (auc, nfalse) = y_true
+    //     .into_no_null_iter()
+    //     .fold((0.0, 0.0), |(auc, nfalse), y_i| {
+    //         let new_nfalse = nfalse + (1.0 - y_i);
+    //         let new_auc = auc + y_i * new_nfalse;
+    //         (new_auc, new_nfalse)
+    //     });
+
+    // auc / (nfalse * (n - nfalse))
 }
 
 // Max KS code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/stats/ks.rs

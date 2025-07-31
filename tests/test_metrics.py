@@ -37,6 +37,9 @@ TRUE_SCORE_COMBOS = [
 Y_TRUE_REG = np.random.rand(N_ROWS)
 Y_SCORE_REG = np.random.rand(N_ROWS)
 
+SAMPLE_WEIGHT = np.random.rand(N_ROWS)
+SAMPLE_WEIGHT[:100] = 1.0
+
 THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 
@@ -48,9 +51,9 @@ def reference_f1(y_true, y_pred):
     return f1
 
 
-def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
+def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0, sample_weight=None):
     tn, fp, fn_, tp = sklearn.metrics.confusion_matrix(
-        y_true, y_pred, labels=[False, True]
+        y_true, y_pred, labels=[False, True], sample_weight=sample_weight
     ).ravel()
 
     p = tp + fn_
@@ -60,7 +63,11 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
     fpr = fp / n
     tnr = 1.0 - fpr
     precision = sklearn.metrics.precision_score(
-        y_true, y_pred, labels=[False, True], zero_division=np.nan
+        y_true,
+        y_pred,
+        labels=[False, True],
+        zero_division=np.nan,
+        sample_weight=sample_weight,
     )
     false_omission_rate = fn_ / (fn_ + tn)
     plr = tpr / fpr
@@ -74,13 +81,18 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
     dor = plr / nlr
     balanced_accuracy = (tpr + tnr) / 2
     fbeta = sklearn.metrics.fbeta_score(
-        y_true, y_pred, beta=beta, labels=[False, True], zero_division=np.nan
+        y_true,
+        y_pred,
+        beta=beta,
+        labels=[False, True],
+        zero_division=np.nan,
+        sample_weight=sample_weight,
     )
     folkes_mallows_index = np.sqrt(precision * tpr)
     mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
         fnr * fpr * false_omission_rate * fdr
     )
-    acc = sklearn.metrics.accuracy_score(y_true, y_pred)
+    acc = sklearn.metrics.accuracy_score(y_true, y_pred, sample_weight=sample_weight)
     threat_score = tp / (tp + fn_ + fp)
     ppr = (tp + fp) / (p + n)
     pnr = (tn + fn_) / (p + n)
@@ -122,9 +134,14 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0):
 
 
 @pytest.mark.parametrize("y_true,y_pred", TRUE_PRED_COMBOS)
-def test_confusion_matrix(y_true, y_pred):
-    ref = reference_confusion_matrix(y_true, y_pred).__dict__
-    fs = rs.metrics.confusion_matrix(y_true, y_pred).__dict__
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+def test_confusion_matrix(y_true, y_pred, sample_weight):
+    ref = reference_confusion_matrix(
+        y_true, y_pred, sample_weight=sample_weight
+    ).__dict__
+    fs = rs.metrics.confusion_matrix(
+        y_true, y_pred, sample_weight=sample_weight
+    ).__dict__
 
     assert pytest.approx(list(fs.values()), nan_ok=True) == list(ref.values())
 
@@ -182,17 +199,20 @@ def test_fbeta(y_true, y_pred):
         assert pytest.approx(ref, nan_ok=True) == res
 
 
-def reference_roc_auc(y_true, y_score):
+def reference_roc_auc(y_true, y_score, sample_weight):
     try:
-        return sklearn.metrics.roc_auc_score(y_true, y_score)
+        return sklearn.metrics.roc_auc_score(
+            y_true, y_score, sample_weight=sample_weight
+        )
     except ValueError:
         return float("nan")
 
 
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
-def test_roc_auc(y_true, y_score):
-    ref = reference_roc_auc(y_true, y_score)
-    fs = rs.metrics.roc_auc(y_true, y_score)
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+def test_roc_auc(y_true, y_score, sample_weight):
+    ref = reference_roc_auc(y_true, y_score, sample_weight=sample_weight)
+    fs = rs.metrics.roc_auc(y_true, y_score, sample_weight=sample_weight)
 
     assert pytest.approx(fs, nan_ok=True) == ref
 
@@ -253,11 +273,15 @@ def test_root_mean_squared_error():
     assert pytest.approx(res) == ref
 
 
-def reference_confusion_matrix_at_thresholds(y_true, y_score, beta):
+def reference_confusion_matrix_at_thresholds(
+    y_true, y_score, beta, sample_weight, thresholds
+) -> pl.DataFrame:
+    if thresholds is None:
+        thresholds = y_score
     cms = []
-    for t in y_score:
+    for t in thresholds:
         cms.append(
-            reference_confusion_matrix(y_true, y_score >= t, beta)
+            reference_confusion_matrix(y_true, y_score >= t, beta, sample_weight)
             .to_polars()
             .with_columns(pl.lit(t).alias("threshold"))
         )
@@ -266,46 +290,40 @@ def reference_confusion_matrix_at_thresholds(y_true, y_score, beta):
 
 
 @pytest.mark.parametrize("beta", [0.1, 1, 11])
-def test_confusion_matrix_at_thresholds(beta):
+@pytest.mark.parametrize(
+    "sample_weight",
+    [
+        None,
+        SAMPLE_WEIGHT,
+    ],
+)
+@pytest.mark.parametrize("loop_strategy", ["loop", "cum_sum"])
+@pytest.mark.parametrize("thresholds", [None, THRESHOLDS])
+def test_confusion_matrix_at_thresholds(beta, sample_weight, loop_strategy, thresholds):
     y_true = Y_TRUE
     y_score = Y_SCORE
 
     ref = (
-        reference_confusion_matrix_at_thresholds(y_true, y_score, beta=beta)
+        reference_confusion_matrix_at_thresholds(
+            y_true,
+            y_score,
+            beta=beta,
+            sample_weight=sample_weight,
+            thresholds=thresholds,
+        )
         .fill_nan(None)
         .sort(["threshold", "metric"])
     )
 
-    # loop
-    res = rs.metrics.confusion_matrix_at_thresholds(
-        y_true, y_score, beta=beta, strategy="loop"
-    ).sort("threshold", "metric")
-    polars.testing.assert_series_equal(ref["value"], res["value"])
-
-    # cum_sum
-    res = rs.metrics.confusion_matrix_at_thresholds(
-        y_true, y_score, beta=beta, strategy="cum_sum"
-    ).sort("threshold", "metric")
-    polars.testing.assert_series_equal(ref["value"], res["value"])
-
-    # Specifying thresholds
-    thresholds = THRESHOLDS
-
-    ref = rs.metrics.confusion_matrix_at_thresholds(
-        y_true,
-        y_score,
-        beta=beta,
-        strategy="loop",
-        thresholds=thresholds,
-    ).sort("threshold", "metric")
-
     res = rs.metrics.confusion_matrix_at_thresholds(
         y_true,
         y_score,
         beta=beta,
-        strategy="cum_sum",
+        sample_weight=sample_weight,
+        strategy=loop_strategy,
         thresholds=thresholds,
     ).sort("threshold", "metric")
+
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
 
