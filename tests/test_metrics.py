@@ -199,17 +199,20 @@ def test_fbeta(y_true, y_pred):
         assert pytest.approx(ref, nan_ok=True) == res
 
 
-def reference_roc_auc(y_true, y_score):
+def reference_roc_auc(y_true, y_score, sample_weight):
     try:
-        return sklearn.metrics.roc_auc_score(y_true, y_score)
+        return sklearn.metrics.roc_auc_score(
+            y_true, y_score, sample_weight=sample_weight
+        )
     except ValueError:
         return float("nan")
 
 
 @pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
-def test_roc_auc(y_true, y_score):
-    ref = reference_roc_auc(y_true, y_score)
-    fs = rs.metrics.roc_auc(y_true, y_score)
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+def test_roc_auc(y_true, y_score, sample_weight):
+    ref = reference_roc_auc(y_true, y_score, sample_weight=sample_weight)
+    fs = rs.metrics.roc_auc(y_true, y_score, sample_weight=sample_weight)
 
     assert pytest.approx(fs, nan_ok=True) == ref
 

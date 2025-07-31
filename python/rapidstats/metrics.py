@@ -202,7 +202,9 @@ def confusion_matrix(
     return ConfusionMatrix(*_confusion_matrix(df, beta))
 
 
-def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
+def roc_auc(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> float:
     """Computes Area Under the Receiver Operating Characteristic Curve.
 
     Parameters
@@ -220,7 +222,7 @@ def roc_auc(y_true: ArrayLike, y_score: ArrayLike) -> float:
     Added in version 0.1.0
     ----------------------
     """
-    df = _y_true_y_score_to_df(y_true, y_score).with_columns(
+    df = _y_true_y_score_to_df(y_true, y_score, sample_weight).with_columns(
         pl.col("y_true").cast(pl.Float64)
     )
 
@@ -592,6 +594,18 @@ def _set_loop_strategy(
 
 
 def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+    """Compute basic confusion matrix.
+
+    Parameters
+    ----------
+    pf : PolarsFrame
+        Needs `y_true`, `threshold`, and `sample_weight`
+
+    Returns
+    -------
+    PolarsFrame
+        A frame of `threshold`, `tn`, `fp`, `fn`, and `tp`
+    """
     return (
         pf.sort("threshold", descending=True)
         .with_columns(

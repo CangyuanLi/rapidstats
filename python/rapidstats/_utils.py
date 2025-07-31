@@ -17,11 +17,20 @@ def _regression_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
     )
 
 
-def _y_true_y_score_to_df(y_true: ArrayLike, y_score: ArrayLike) -> pl.DataFrame:
+def _y_true_y_score_to_df(
+    y_true: ArrayLike, y_score: ArrayLike, sample_weight: Optional[ArrayLike] = None
+) -> pl.DataFrame:
     return (
-        pl.DataFrame({"y_true": y_true, "y_score": y_score})
+        pl.DataFrame(
+            {
+                "y_true": y_true,
+                "y_score": y_score,
+                "sample_weight": 1.0 if sample_weight is None else sample_weight,
+            }
+        )
         .with_columns(
-            pl.col("y_true").cast(pl.Boolean), pl.col("y_score").cast(pl.Float64)
+            pl.col("y_true").cast(pl.Boolean),
+            pl.col("y_score", "sample_weight").cast(pl.Float64),
         )
         .drop_nulls()
     )

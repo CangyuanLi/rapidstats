@@ -162,17 +162,34 @@ pub fn bootstrap_confusion_matrix(
 pub fn roc_auc(df: DataFrame) -> f64 {
     let df = df.sort(["y_score"], Default::default()).unwrap();
     let y_true = df["y_true"].f64().unwrap();
+    let sample_weight = df["sample_weight"].f64().unwrap();
 
-    let n = y_true.len() as f64;
-    let (auc, nfalse) = y_true
+    let (auc, n_false) = y_true
         .into_no_null_iter()
-        .fold((0.0, 0.0), |(auc, nfalse), y_i| {
-            let new_nfalse = nfalse + (1.0 - y_i);
-            let new_auc = auc + y_i * new_nfalse;
-            (new_auc, new_nfalse)
+        .zip(sample_weight.into_no_null_iter())
+        .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
+            let new_n_false = n_false + (1.0 - y_i) * w_i;
+            let new_auc = auc + y_i * w_i * new_n_false;
+            (new_auc, new_n_false)
         });
 
-    auc / (nfalse * (n - nfalse))
+    let n_true = y_true
+        .into_no_null_iter()
+        .zip(sample_weight.into_no_null_iter())
+        .fold(0.0, |acc, (y_i, w_i)| acc + y_i * w_i);
+
+    auc / (n_false * n_true)
+
+    // let n = y_true.len() as f64;
+    // let (auc, nfalse) = y_true
+    //     .into_no_null_iter()
+    //     .fold((0.0, 0.0), |(auc, nfalse), y_i| {
+    //         let new_nfalse = nfalse + (1.0 - y_i);
+    //         let new_auc = auc + y_i * new_nfalse;
+    //         (new_auc, new_nfalse)
+    //     });
+
+    // auc / (nfalse * (n - nfalse))
 }
 
 // Max KS code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/stats/ks.rs
