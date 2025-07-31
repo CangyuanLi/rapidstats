@@ -886,6 +886,7 @@ def average_precision(
     """
     return (
         _y_true_y_score_to_df(y_true, y_score, sample_weight)
+        .lazy()
         .rename({"y_score": "threshold"})
         .pipe(_base_confusion_matrix_at_thresholds)
         .pipe(_full_confusion_matrix_from_base)
