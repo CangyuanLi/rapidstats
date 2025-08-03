@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import polars as pl
 import polars.testing
@@ -39,6 +41,9 @@ Y_SCORE_REG = np.random.rand(N_ROWS)
 
 SAMPLE_WEIGHT = np.random.rand(N_ROWS)
 SAMPLE_WEIGHT[:100] = 1.0
+
+PROTECTED = np.random.choice([True, False], N_ROWS)
+CONTROL = ~PROTECTED
 
 THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
@@ -327,7 +332,50 @@ def test_confusion_matrix_at_thresholds(beta, sample_weight, loop_strategy, thre
     polars.testing.assert_series_equal(ref["value"], res["value"])
 
 
-def test_adverse_impact_ratio():
+def reference_adverse_impact_ratio(
+    approved, protected, control, sample_weight
+) -> float:
+    df = pl.DataFrame(
+        {
+            "approved": approved,
+            "protected": protected,
+            "control": control,
+            "sample_weight": 1.0 if sample_weight is None else sample_weight,
+        }
+    )
+
+    p = df.filter(pl.col("protected"))
+    appr_rate_protected = np.average(p["approved"], weights=p["sample_weight"])
+
+    c = df.filter(pl.col("control"))
+    appr_rate_control = np.average(c["approved"], weights=c["sample_weight"])
+
+    res = float(appr_rate_protected / appr_rate_control)
+
+    if math.isfinite(res):
+        return res
+    else:
+        return None
+
+
+def reference_adverse_impact_ratio_at_thresholds(
+    y_score, protected, control, sample_weight, thresholds
+):
+    if thresholds is None:
+        thresholds = y_score
+
+    res = {"threshold": [], "air": []}
+    for t in thresholds:
+        air = reference_adverse_impact_ratio(
+            y_score < t, protected, control, sample_weight
+        )
+        res["threshold"].append(t)
+        res["air"].append(air)
+
+    return pl.DataFrame(res)
+
+
+def test_adverse_impact_ratio_all_approved():
     y_pred = [True] * 1_00
     protected = [True] * 50 + [False] * 50
     control = [False] * 50 + [True] * 50
@@ -337,28 +385,43 @@ def test_adverse_impact_ratio():
     )
 
 
-def test_adverse_impact_ratio_at_thresholds():
-    x = len(Y_SCORE) // 2
-    protected = [True] * x + [False] * x
-    control = [False] * x + [True] * x
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+def test_adverse_impact_ratio(sample_weight):
+    t = 0.5
+    ref = reference_adverse_impact_ratio(
+        Y_SCORE < t,
+        protected=PROTECTED,
+        control=CONTROL,
+        sample_weight=sample_weight,
+    )
+    res = rs.metrics.adverse_impact_ratio(
+        Y_SCORE < t,
+        protected=PROTECTED,
+        control=CONTROL,
+        sample_weight=sample_weight,
+    )
+    assert pytest.approx(ref) == res
 
-    # None
-    ref = rs.metrics.adverse_impact_ratio_at_thresholds(
-        Y_SCORE, protected, control, strategy="loop"
+
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+@pytest.mark.parametrize("thresholds", [None, THRESHOLDS])
+@pytest.mark.parametrize("strategy", ["loop", "cum_sum"])
+def test_adverse_impact_ratio_at_thresholds(sample_weight, thresholds, strategy):
+    ref = reference_adverse_impact_ratio_at_thresholds(
+        Y_SCORE,
+        protected=PROTECTED,
+        control=CONTROL,
+        sample_weight=sample_weight,
+        thresholds=thresholds,
     ).sort("threshold")
+
     res = rs.metrics.adverse_impact_ratio_at_thresholds(
-        Y_SCORE, protected, control, strategy="cum_sum"
-    ).sort("threshold")
-
-    polars.testing.assert_series_equal(ref["air"], res["air"])
-
-    # Specifying thresholds
-    thresholds = THRESHOLDS
-    ref = rs.metrics.adverse_impact_ratio_at_thresholds(
-        Y_SCORE, protected, control, thresholds=thresholds, strategy="loop"
-    ).sort("threshold")
-    res = rs.metrics.adverse_impact_ratio_at_thresholds(
-        Y_SCORE, protected, control, thresholds=thresholds, strategy="cum_sum"
+        Y_SCORE,
+        protected=PROTECTED,
+        control=CONTROL,
+        sample_weight=sample_weight,
+        thresholds=thresholds,
+        strategy=strategy,
     ).sort("threshold")
 
     polars.testing.assert_series_equal(ref["air"], res["air"])
