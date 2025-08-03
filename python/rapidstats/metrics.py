@@ -379,6 +379,7 @@ def adverse_impact_ratio(
     y_pred: ArrayLike,
     protected: ArrayLike,
     control: ArrayLike,
+    sample_weight: Optional[ArrayLike] = None,
 ) -> float:
     """Computes the Adverse Impact Ratio (AIR), which is the ratio of negative
     predictions for the protected class and the control class. The ideal ratio is 1.
@@ -394,6 +395,11 @@ def adverse_impact_ratio(
         An array of booleans identifying the protected class
     control : ArrayLike
         An array of booleans identifying the control class
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
 
     Returns
     -------
@@ -405,13 +411,22 @@ def adverse_impact_ratio(
     """
     return _adverse_impact_ratio(
         pl.DataFrame(
-            {"y_pred": y_pred, "protected": protected, "control": control}
-        ).cast(pl.Boolean)
+            {
+                "y_pred": y_pred,
+                "protected": protected,
+                "control": control,
+                "sample_weight": 1.0 if sample_weight is None else sample_weight,
+            }
+        )
+        .with_columns(pl.col("y_pred", "protected", "control").cast(pl.Boolean))
+        .with_columns(pl.col("y_pred").cast(pl.Float64))
     )
 
 
 def _air_at_thresholds_core(
-    pf: PolarsFrame, thresholds: Optional[list[float]] = None
+    pf: PolarsFrame,
+    thresholds: Optional[list[float]],
+    has_sample_weight: bool,
 ) -> pl.LazyFrame:
     def _appr_rate(pf: PolarsFrame) -> pl.LazyFrame:
         # An approve is score < t
@@ -426,11 +441,33 @@ def _air_at_thresholds_core(
             .unique("threshold")
         )
 
-    p = _appr_rate(pf.filter(pl.col("protected"))).rename(
+    def _appr_rate_sample_weight(pf: PolarsFrame) -> pl.LazyFrame:
+        # An approve is score < t
+        return (
+            pf.lazy()
+            .sort("y_score", descending=False)
+            .with_columns(
+                pl.col("sample_weight")
+                .shift(1, fill_value=0.0)
+                .cum_sum()
+                .alias("cumulative_approved")
+            )
+            .with_columns(
+                pl.col("cumulative_approved")
+                .truediv(pl.col("sample_weight").sum())
+                .alias("appr_rate")
+            )
+            .rename({"y_score": "threshold"})
+            .unique("threshold")
+        )
+
+    _appr_rate_func = _appr_rate_sample_weight if has_sample_weight else _appr_rate
+
+    p = _appr_rate_func(pf.filter(pl.col("protected"))).rename(
         {"appr_rate": "appr_rate_protected"}
     )
 
-    c = _appr_rate(pf.filter(pl.col("control"))).rename(
+    c = _appr_rate_func(pf.filter(pl.col("control"))).rename(
         {"appr_rate": "appr_rate_control"}
     )
 
@@ -473,6 +510,7 @@ def adverse_impact_ratio_at_thresholds(
     y_score: ArrayLike,
     protected: ArrayLike,
     control: ArrayLike,
+    sample_weight: Optional[ArrayLike] = None,
     thresholds: Optional[list[float]] = None,
     strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
@@ -495,6 +533,11 @@ def adverse_impact_ratio_at_thresholds(
         An array of booleans identifying the protected class
     control : ArrayLike
         An array of booleans identifying the control class
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
     thresholds : Optional[list[float]], optional
         The thresholds to compute `is_predicted_negative` at, i.e. y_score < t. If None,
         uses every score present in `y_score`, by default None
@@ -509,9 +552,18 @@ def adverse_impact_ratio_at_thresholds(
     Added in version 0.1.0
     ----------------------
     """
+    has_sample_weight = sample_weight is not None
     df = pl.DataFrame(
-        {"y_score": y_score, "protected": protected, "control": control}
-    ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
+        {
+            "y_score": y_score,
+            "protected": protected,
+            "control": control,
+            "sample_weight": sample_weight if has_sample_weight else 1.0,
+        }
+    ).with_columns(
+        pl.col("protected", "control").cast(pl.Boolean),
+        pl.col("y_score", "sample_weight").cast(pl.Float64),
+    )
 
     strategy = _set_loop_strategy(thresholds, strategy)
 
@@ -522,7 +574,10 @@ def adverse_impact_ratio_at_thresholds(
                 "threshold": t,
                 "air": _adverse_impact_ratio(
                     df.select(
-                        pl.col("y_score").lt(t).alias("y_pred"), "protected", "control"
+                        pl.col("y_score").lt(t).cast(pl.Float64).alias("y_pred"),
+                        "protected",
+                        "control",
+                        "sample_weight",
                     )
                 ),
             }
@@ -531,7 +586,9 @@ def adverse_impact_ratio_at_thresholds(
 
         res = pl.LazyFrame(airs)
     elif strategy == "cum_sum":
-        res = _air_at_thresholds_core(df, thresholds)
+        res = _air_at_thresholds_core(
+            df, thresholds, has_sample_weight=has_sample_weight
+        )
 
     return res.pipe(_fill_infinite, None).fill_nan(None).collect()
 

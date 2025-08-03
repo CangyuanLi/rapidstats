@@ -281,11 +281,23 @@ pub fn mean(df: DataFrame) -> f64 {
 pub fn adverse_impact_ratio(df: DataFrame) -> f64 {
     let is_protected = df["protected"].bool().unwrap();
     let is_control = df["control"].bool().unwrap();
-    let y_pred = df["y_pred"].bool().unwrap();
+    let y_pred = df["y_pred"].f64().unwrap();
+    let sample_weight = df["sample_weight"].f64().unwrap();
     let protected = y_pred.filter(is_protected).unwrap();
+    let protected_sample_weight = sample_weight.filter(is_protected).unwrap();
     let control = y_pred.filter(is_control).unwrap();
+    let control_sample_weight = sample_weight.filter(is_control).unwrap();
 
-    let res = protected.mean().unwrap_or(f64::NAN) / control.mean().unwrap_or(f64::NAN);
+    let protected_approval_rate = (&protected * &protected_sample_weight)
+        .sum()
+        .unwrap_or(f64::NAN)
+        / protected_sample_weight.sum().unwrap_or(f64::NAN);
+    let control_approval_rate = (&control * &control_sample_weight)
+        .sum()
+        .unwrap_or(f64::NAN)
+        / control_sample_weight.sum().unwrap_or(f64::NAN);
+
+    let res = protected_approval_rate / control_approval_rate;
 
     if res.is_infinite() {
         f64::NAN

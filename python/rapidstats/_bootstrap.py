@@ -906,7 +906,11 @@ class Bootstrap:
         return _bootstrap_mean(df, **self._params)
 
     def adverse_impact_ratio(
-        self, y_pred: ArrayLike, protected: ArrayLike, control: ArrayLike
+        self,
+        y_pred: ArrayLike,
+        protected: ArrayLike,
+        control: ArrayLike,
+        sample_weight: Optional[ArrayLike] = None,
     ) -> ConfidenceInterval:
         """Bootstrap AIR. See [rapidstats.metrics.adverse_impact_ratio][] for more details.
 
@@ -918,6 +922,11 @@ class Bootstrap:
             An array of booleans identifying the protected class
         control : ArrayLike
             An array of booleans identifying the control class
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
 
         Returns
         -------
@@ -927,9 +936,18 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = pl.DataFrame(
-            {"y_pred": y_pred, "protected": protected, "control": control}
-        ).cast(pl.Boolean)
+        df = (
+            pl.DataFrame(
+                {
+                    "y_pred": y_pred,
+                    "protected": protected,
+                    "control": control,
+                    "sample_weight": 1.0 if sample_weight is None else sample_weight,
+                }
+            )
+            .with_columns(pl.col("y_pred", "protected", "control").cast(pl.Boolean))
+            .with_columns(pl.col("y_pred").cast(pl.Float64))
+        )
 
         return _bootstrap_adverse_impact_ratio(df, **self._params)
 
@@ -938,6 +956,7 @@ class Bootstrap:
         y_score: ArrayLike,
         protected: ArrayLike,
         control: ArrayLike,
+        sample_weight: Optional[ArrayLike] = None,
         thresholds: Optional[list[float]] = None,
         strategy: LoopStrategy = "auto",
     ) -> pl.DataFrame:
@@ -952,6 +971,11 @@ class Bootstrap:
             An array of booleans identifying the protected class
         control : ArrayLike
             An array of booleans identifying the control class
+        sample_weight: Optional[ArrayLike], optional
+            Sample weights, set to 1 if None
+
+            !!! Version
+                Added 0.2.0
         thresholds : Optional[list[float]], optional
             The thresholds to compute `is_predicted_negative` at, i.e. y_score < t.
             If None, uses every score present in `y_score`, by default None
@@ -968,9 +992,18 @@ class Bootstrap:
         NotImplementedError
             When `strategy` is `cum_sum` and `method` is `BCa`
         """
+        has_sample_weight = sample_weight is not None
         df = pl.DataFrame(
             {"y_score": y_score, "protected": protected, "control": control}
-        ).with_columns(pl.col("protected", "control").cast(pl.Boolean))
+        ).with_columns(
+            pl.col("protected", "control").cast(pl.Boolean),
+            pl.col("y_score").cast(pl.Float64),
+        )
+
+        if has_sample_weight:
+            df = df.with_columns(
+                pl.Series("sample_weight", sample_weight).cast(pl.Float64)
+            )
 
         strategy = _set_loop_strategy(thresholds, strategy)
 
@@ -978,7 +1011,10 @@ class Bootstrap:
             airs: list[dict[str, float]] = []
             for t in tqdm(set(thresholds or y_score)):
                 lower, mean, upper = self.adverse_impact_ratio(
-                    df["y_score"].lt(t), df["protected"], df["control"]
+                    df["y_score"].lt(t),
+                    df["protected"],
+                    df["control"],
+                    sample_weight=sample_weight,
                 )
                 airs.append(
                     {"threshold": t, "lower": lower, "mean": mean, "upper": upper}
@@ -993,7 +1029,7 @@ class Bootstrap:
             def _air(i: int) -> pl.LazyFrame:
                 sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
 
-                return _air_at_thresholds_core(sample_df, thresholds)
+                return _air_at_thresholds_core(sample_df, thresholds, has_sample_weight)
 
             airs: list[pl.LazyFrame] = _run_concurrent(
                 _air,
@@ -1029,7 +1065,7 @@ class Bootstrap:
                 )
             elif self.method == "basic":
                 original = (
-                    _air_at_thresholds_core(df)
+                    _air_at_thresholds_core(df, thresholds, has_sample_weight)
                     .rename({"air": "original"})
                     .unique("threshold")
                 )
@@ -1046,12 +1082,18 @@ class Bootstrap:
                     "Method `BCa` not implemented for strategy `cum_sum` due to https://github.com/pola-rs/polars/issues/20951"
                 )
                 original_lf = (
-                    _air_at_thresholds_core(df, thresholds)
+                    _air_at_thresholds_core(df, thresholds, has_sample_weight)
                     .rename({"air": "original_value"})
                     .unique("threshold")
                 )
+
+                tmp = functools.partial(
+                    _air_at_thresholds_core,
+                    thresholds=thresholds,
+                    has_sample_weight=has_sample_weight,
+                )
                 jacknife_lf = (
-                    pl.concat(_jacknife(df, _air_at_thresholds_core), how="vertical")
+                    pl.concat(_jacknife(df, tmp), how="vertical")
                     .rename({"air": "value"})
                     .unique("threshold")
                 )
