@@ -321,8 +321,13 @@ def mean(y: ArrayLike) -> float:
     return _mean(pl.DataFrame({"y": y}))
 
 
+def _weighted_mean(x: pl.Series, sample_weight: pl.Series):
+    return (x * sample_weight).sum() / (sample_weight.sum())
+
+
 def predicted_positive_ratio_at_thresholds(
     y_score: ArrayLike,
+    sample_weight: Optional[ArrayLike] = None,
     thresholds: Optional[list[float]] = None,
     strategy: LoopStrategy = "auto",
 ) -> pl.DataFrame:
@@ -334,6 +339,11 @@ def predicted_positive_ratio_at_thresholds(
     ----------
     y_score : ArrayLike
         Predicted scores
+    sample_weight: Optional[ArrayLike], optional
+        Sample weights, set to 1 if None
+
+        !!! Version
+            Added 0.2.0
     thresholds : Optional[list[float]], optional
         The thresholds to compute `y_pred` at, i.e. y_score >= t. If None,
         uses every score present in `y_score`, by default None
@@ -348,24 +358,50 @@ def predicted_positive_ratio_at_thresholds(
     Added in version 0.1.0
     ----------------------
     """
+    lf = pl.LazyFrame(
+        {
+            "y_score": y_score,
+            "sample_weight": 1.0 if sample_weight is None else sample_weight,
+        }
+    ).drop_nulls()
+
     strategy = _set_loop_strategy(y_score, strategy)
 
     if strategy == "loop":
-        s = pl.Series(y_score).drop_nulls()
+        df = lf.collect()
 
         def _ppr(t: float) -> float:
-            return {"threshold": t, "ppr": s.ge(t).mean()}
+            return {
+                "threshold": t,
+                "ppr": _weighted_mean(df["y_score"].ge(t), df["sample_weight"]),
+            }
 
         return pl.DataFrame(_run_concurrent(_ppr, set(thresholds or y_score)))
     elif strategy == "cum_sum":
+
+        def _cumulative_ppr(lf: pl.LazyFrame, has_sample_weight: bool):
+            if not has_sample_weight:
+                return lf.with_row_index(
+                    "cumulative_predicted_positive", offset=1
+                ).with_columns(
+                    pl.col("cumulative_predicted_positive")
+                    .truediv(pl.len())
+                    .alias("ppr")
+                )
+            else:
+                return lf.with_columns(
+                    pl.col("sample_weight")
+                    .cum_sum()
+                    .alias("cumulative_predicted_positive")
+                ).with_columns(
+                    pl.col("cumulative_predicted_positive")
+                    .truediv(pl.col("sample_weight").sum())
+                    .alias("ppr")
+                )
+
         return (
-            pl.LazyFrame({"y_score": y_score})
-            .drop_nulls()
-            .sort("y_score", descending=True)
-            .with_row_index("cumulative_predicted_positive", offset=1)
-            .with_columns(
-                pl.col("cumulative_predicted_positive").truediv(pl.len()).alias("ppr")
-            )
+            lf.sort("y_score", descending=True)
+            .pipe(_cumulative_ppr, sample_weight is not None)
             .rename({"y_score": "threshold"})
             .select("threshold", "ppr")
             .unique("threshold")

@@ -427,10 +427,34 @@ def test_adverse_impact_ratio_at_thresholds(sample_weight, thresholds, strategy)
     polars.testing.assert_series_equal(ref["air"], res["air"])
 
 
-def test_predicted_positive_ratio_at_thresholds():
-    ref = rs.metrics.predicted_positive_ratio_at_thresholds(Y_SCORE).sort("threshold")
+def reference_predicted_positive_ratio_at_thresholds(
+    y_score, sample_weight, thresholds
+) -> pl.DataFrame:
+    if thresholds is None:
+        thresholds = y_score
+
+    res = {"threshold": [], "ppr": []}
+    for t in thresholds:
+        ppr = float(np.average(y_score >= t, weights=sample_weight))
+
+        if not math.isfinite(ppr):
+            ppr = None
+
+        res["ppr"].append(ppr)
+        res["threshold"].append(t)
+
+    return pl.DataFrame(res)
+
+
+@pytest.mark.parametrize("sample_weight", [None, SAMPLE_WEIGHT])
+@pytest.mark.parametrize("thresholds", [None, THRESHOLDS])
+@pytest.mark.parametrize("strategy", ["loop", "cum_sum"])
+def test_predicted_positive_ratio_at_thresholds(sample_weight, thresholds, strategy):
+    ref = reference_predicted_positive_ratio_at_thresholds(
+        Y_SCORE, sample_weight=sample_weight, thresholds=thresholds
+    ).sort("threshold")
     res = rs.metrics.predicted_positive_ratio_at_thresholds(
-        Y_SCORE, strategy="cum_sum"
+        Y_SCORE, sample_weight=sample_weight, thresholds=thresholds, strategy=strategy
     ).sort("threshold")
 
     polars.testing.assert_series_equal(ref["ppr"], res["ppr"])
