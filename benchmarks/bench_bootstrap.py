@@ -15,6 +15,9 @@ ITERATIONS = 100
 METHOD = "percentile"
 SEED = 208
 BS = rs.Bootstrap(iterations=ITERATIONS, method=METHOD, seed=SEED)
+BS_MULTINOMIAL = rs.Bootstrap(
+    iterations=ITERATIONS, method=METHOD, sampling_method="multinomial", seed=SEED
+)
 
 DF = (
     pl.scan_parquet(BASE_PATH / "benchmark_data.parquet")
@@ -28,6 +31,12 @@ DF = (
 @pybench.config(repeat=10)
 def bench_bootstrap_roc_auc():
     BS.roc_auc(DF["y_true"], DF["y_score"])
+
+
+@pybench.metadata(group="bootstrap_roc_auc")
+@pybench.config(repeat=10)
+def bench_bootstrap_multinomial_roc_auc():
+    BS_MULTINOMIAL.roc_auc(DF["y_true"], DF["y_score"])
 
 
 @pybench.metadata(group="bootstrap_roc_auc")
