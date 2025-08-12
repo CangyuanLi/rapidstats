@@ -23,6 +23,7 @@ from ._rustystats import (
     _bootstrap_mean_squared_error,
     _bootstrap_r2,
     _bootstrap_roc_auc,
+    _bootstrap_roc_auc_sorted,
     _bootstrap_root_mean_squared_error,
     _percentile_interval,
     _standard_interval,
@@ -374,6 +375,11 @@ class Bootstrap:
     method : Literal["standard", "percentile", "basic", "BCa"], optional
         Whether to return the Percentile, Basic / Reverse Percentile, or
         Bias Corrected and Accelerated Interval, by default "percentile"
+    sampling_method: Literal["poisson", "multinomial"], optional
+        How to sample. If "multinomial", sample with replacement. If "poisson", simulate
+        number of draws via a Poisson(1) distribution. Note that "poisson" is usually
+        much more performant, especially since order is preserved, which allows certain
+        functions to avoid sorting every iteration, by default "poisson"
     seed : Optional[int], optional
         Seed that controls resampling. Set this to any integer to make results
         reproducible, by default None
@@ -388,6 +394,8 @@ class Bootstrap:
     ------
     ValueError
         If the method is not one of `standard`, `percentile`, `basic`, or `BCa`
+    ValueError
+        If the sampling method is not one of `poisson` or `multinomial`
 
     Examples
     --------
@@ -403,6 +411,7 @@ class Bootstrap:
         iterations: int = 1_000,
         confidence: float = 0.95,
         method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
+        sampling_method: Literal["poisson", "multinomial"] = "poisson",
         seed: Optional[int] = None,
         n_jobs: Optional[int] = None,
         chunksize: Optional[int] = None,
@@ -412,11 +421,17 @@ class Bootstrap:
                 f"Invalid confidence interval method `{method}`, only `standard`, `percentile`, `basic`, and `BCa` are supported",
             )
 
+        if sampling_method not in ("poisson", "multinomial"):
+            raise ValueError(
+                f"Invalid sampling method `{sampling_method}`, only `poisson` and `multinomial` are supported"
+            )
+
         self.iterations = iterations
         self.confidence = confidence
         self.seed = seed
         self.alpha = (1 - confidence) / 2
         self.method = method
+        self.sampling_method = sampling_method
         self.n_jobs = n_jobs
         self.chunksize = chunksize
 
@@ -427,6 +442,7 @@ class Bootstrap:
             "seed": self.seed,
             "n_jobs": self.n_jobs,
             "chunksize": self.chunksize,
+            "poisson": self.sampling_method == "poisson",
         }
 
     def run(
@@ -522,7 +538,9 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
+        df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight).with_columns(
+            pl.col("y_true").cast(pl.UInt8)
+        )
 
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(df, beta, **self._params)
@@ -733,7 +751,13 @@ class Bootstrap:
             pl.col("y_true").cast(pl.Float64)
         )
 
-        return _bootstrap_roc_auc(df, **self._params)
+        if self._params["poisson"]:
+            df = df.sort("y_score")
+            _f = _bootstrap_roc_auc_sorted
+        else:
+            _f = _bootstrap_roc_auc
+
+        return _f(df, **self._params)
 
     def average_precision(
         self,

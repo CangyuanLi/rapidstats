@@ -26,7 +26,7 @@ macro_rules! generate_functions {
 
         paste! {
             #[pyfunction]
-            #[pyo3(signature = (df, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None))]
+            #[pyo3(signature = (df, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None, poisson = true))]
             fn [<_bootstrap $func_name>] (
                 df: PyDataFrame,
                 iterations: u64,
@@ -35,10 +35,11 @@ macro_rules! generate_functions {
                 seed: Option<u64>,
                 n_jobs: Option<usize>,
                 chunksize: Option<usize>,
+                poisson: bool,
             ) -> PyResult<bootstrap::ConfidenceInterval> {
                 let df: DataFrame = df.into();
                 let bootstrap_stats =
-                    bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func, n_jobs, chunksize);
+                    bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func, n_jobs, chunksize, poisson);
                 if method == "standard" {
                     Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
                 }
@@ -76,7 +77,7 @@ fn _confusion_matrix(df: PyDataFrame, beta: f64) -> PyResult<metrics::ConfusionM
 }
 
 #[pyfunction]
-#[pyo3(signature = (df, beta, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None))]
+#[pyo3(signature = (df, beta, iterations, alpha, method, seed = None, n_jobs = None, chunksize = None, poisson = true))]
 fn _bootstrap_confusion_matrix(
     df: PyDataFrame,
     beta: f64,
@@ -86,15 +87,17 @@ fn _bootstrap_confusion_matrix(
     seed: Option<u64>,
     n_jobs: Option<usize>,
     chunksize: Option<usize>,
+    poisson: bool,
 ) -> PyResult<Vec<bootstrap::ConfidenceInterval>> {
     let df: DataFrame = df.into();
 
     Ok(metrics::bootstrap_confusion_matrix(
-        df, beta, iterations, alpha, method, seed, n_jobs, chunksize,
+        df, beta, iterations, alpha, method, seed, n_jobs, chunksize, poisson,
     ))
 }
 
 generate_functions!(_roc_auc, metrics::roc_auc);
+generate_functions!(_roc_auc_sorted, metrics::roc_auc_sorted);
 generate_functions!(_max_ks, metrics::max_ks);
 generate_functions!(_brier_loss, metrics::brier_loss);
 generate_functions!(_mean, metrics::mean);
@@ -178,6 +181,8 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bootstrap_confusion_matrix, m)?)?;
     m.add_function(wrap_pyfunction!(_roc_auc, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_roc_auc, m)?)?;
+    m.add_function(wrap_pyfunction!(_roc_auc_sorted, m)?)?;
+    m.add_function(wrap_pyfunction!(_bootstrap_roc_auc_sorted, m)?)?;
     m.add_function(wrap_pyfunction!(_max_ks, m)?)?;
     m.add_function(wrap_pyfunction!(_bootstrap_max_ks, m)?)?;
     m.add_function(wrap_pyfunction!(_brier_loss, m)?)?;

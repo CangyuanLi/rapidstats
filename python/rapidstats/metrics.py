@@ -202,7 +202,9 @@ def confusion_matrix(
     Added in version 0.1.0
     ----------------------
     """
-    df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
+    df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight).with_columns(
+        pl.col("y_true").cast(pl.UInt8)
+    )
 
     return ConfusionMatrix(*_confusion_matrix(df, beta))
 

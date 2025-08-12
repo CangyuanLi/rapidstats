@@ -184,19 +184,21 @@ def test_loop_cum_sum_shape(bs: rapidstats.Bootstrap):
 
 
 @pytest.mark.parametrize(
-    "bs",
-    [
-        rapidstats.Bootstrap(method=method, iterations=5)
-        for method in ["standard", "percentile", "basic", "BCa"]
-    ],
+    "method",
+    ["standard", "percentile", "basic", "BCa"],
 )
-def test_bootstrap_succesfully_runs(bs: rapidstats.Bootstrap):
+@pytest.mark.parametrize("sampling_method", ["poisson", "multinomial"])
+def test_bootstrap_succesfully_runs(method, sampling_method):
     y_true_score = np.random.rand(100)
     y_true = y_true_score >= 0.5
     y_score = np.random.rand(100)
     y_pred = y_score >= 0.5
     protected = [True] * 50 + [False] * 50
     control = [False] * 50 + [True] * 50
+
+    bs = rapidstats.Bootstrap(
+        method=method, sampling_method=sampling_method, iterations=5
+    )
 
     bs.roc_auc(y_true, y_score)
     bs.average_precision(y_true, y_score)

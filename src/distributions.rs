@@ -1,3 +1,8 @@
+use rand::distributions::Distribution;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use rand_distr::Poisson;
+
 use std::f64::consts::SQRT_2;
 
 pub fn norm_ppf(q: f64) -> f64 {
@@ -79,4 +84,13 @@ fn erf(x: f64) -> f64 {
 
 pub fn norm_cdf(x: f64) -> f64 {
     0.5 * (1.0 + erf(x / SQRT_2))
+}
+
+pub fn poisson(size: usize, seed: Option<u64>) -> Vec<u64> {
+    let seed = seed.unwrap_or_else(|| rand::thread_rng().gen());
+    let rng = StdRng::seed_from_u64(seed);
+
+    let poi = Poisson::new(1.0).unwrap();
+
+    poi.sample_iter(rng).take(size).map(|x| x as u64).collect()
 }
