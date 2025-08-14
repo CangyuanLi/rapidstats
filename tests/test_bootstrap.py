@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 import pytest
@@ -12,6 +14,8 @@ CONFIDENCE_LEVEL = 0.95
 ALPHA = (1 - CONFIDENCE_LEVEL) / 2
 BOOTSTRAP_STATS = np.random.uniform(size=N)
 THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+IRIS_SCORES = pl.read_parquet(Path(__file__).parent / "iris_scores.parquet")
 
 
 def _alpha(confidence_level: float) -> float:
@@ -219,3 +223,22 @@ def test_bootstrap_succesfully_runs(method, sampling_method):
     bs.mean_squared_error(y_true_score, y_score)
     bs.root_mean_squared_error(y_true_score, y_score)
     bs.r2(y_true_score, y_score)
+
+
+def test_poisson_multinomial_close():
+    kwargs = {
+        "seed": 208,
+        "iterations": 1_000,
+        "chunksize": 8,
+        # "n_jobs": 1,
+    }
+
+    p_bs = rapidstats.Bootstrap(sampling_method="poisson", **kwargs)
+    m_bs = rapidstats.Bootstrap(sampling_method="multinomial", **kwargs)
+    y_true = IRIS_SCORES["y_true"]
+    y_score = IRIS_SCORES["y_score"]
+
+    p_res = p_bs.roc_auc(y_true, y_score)
+    m_res = m_bs.roc_auc(y_true, y_score)
+
+    assert pytest.approx(p_res, 1e3) == m_res
