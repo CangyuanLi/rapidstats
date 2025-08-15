@@ -242,3 +242,12 @@ def test_poisson_multinomial_close():
     m_res = m_bs.roc_auc(y_true, y_score)
 
     assert pytest.approx(p_res, 1e3) == m_res
+
+    p_res = p_bs.run(
+        IRIS_SCORES, lambda df: rapidstats.metrics.roc_auc(df["y_true"], df["y_score"])
+    )
+    m_res = m_bs.run(
+        IRIS_SCORES, lambda df: rapidstats.metrics.roc_auc(df["y_true"], df["y_score"])
+    )
+
+    assert pytest.approx(p_res, 1e3) == m_res
