@@ -86,11 +86,11 @@ pub fn norm_cdf(x: f64) -> f64 {
     0.5 * (1.0 + erf(x / SQRT_2))
 }
 
-pub fn poisson(size: usize, seed: Option<u64>) -> Vec<u64> {
+pub fn poisson(lam: f64, size: usize, seed: Option<u64>) -> Vec<u64> {
     let seed = seed.unwrap_or_else(|| rand::thread_rng().gen());
     let rng = StdRng::seed_from_u64(seed);
 
-    let poi = Poisson::new(1.0).unwrap();
+    let poi = Poisson::new(lam).unwrap();
 
     poi.sample_iter(rng).take(size).map(|x| x as u64).collect()
 }

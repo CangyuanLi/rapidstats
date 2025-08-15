@@ -11,7 +11,7 @@ from polars.lazyframe.group_by import LazyGroupBy
 from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
-from ._distributions import norm
+from ._distributions import Random, norm
 from ._rustystats import (
     _basic_interval,
     _bca_interval,
@@ -256,6 +256,25 @@ def _bca_interval_polars(
     )
 
 
+def _poisson_sample(
+    pf: PolarsFrame, df_height: int, seed: Optional[int]
+) -> PolarsFrame:
+    repeats = pl.Series("repeats", Random(seed).poisson(1, size=df_height))
+
+    return (
+        pf.with_row_index("index")
+        .with_columns(repeats)
+        .with_columns(pl.col("index").repeat_by("repeats"))
+        .explode("index")
+        .drop_nulls("index")
+        .drop("index", "repeats")
+    )
+
+
+def _poisson_bs_func(i, df, df_height, stat_func):
+    return stat_func(_poisson_sample(df, df_height, seed=i))
+
+
 class Bootstrap:
     r"""Computes a two-sided bootstrap confidence interval of a statistic. Note that
     \( \alpha \) is then defined as \( \frac{1 - \text{confidence}}{2} \). Regardless
@@ -472,7 +491,12 @@ class Bootstrap:
             if k not in kwargs:
                 kwargs[k] = v
 
-        func = functools.partial(_bs_func, df=df, stat_func=stat_func)
+        if self._params["poisson"]:
+            func = functools.partial(
+                _poisson_bs_func, df=df, df_height=df.height, stat_func=stat_func
+            )
+        else:
+            func = functools.partial(_bs_func, df=df, stat_func=stat_func)
 
         if self.seed is None:
             iterable = (None for _ in range(self.iterations))

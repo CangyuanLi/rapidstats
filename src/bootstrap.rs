@@ -101,7 +101,7 @@ fn sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
 }
 
 fn poisson_sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
-    let repeats = Series::new("repeats".into(), poisson(df_height, seed));
+    let repeats = Series::new("repeats".into(), poisson(1.0, df_height, seed));
 
     df.lazy()
         .with_row_index("index", Some(0))

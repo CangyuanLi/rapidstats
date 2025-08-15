@@ -155,6 +155,11 @@ fn _norm_cdf(x: f64) -> PyResult<f64> {
 }
 
 #[pyfunction]
+fn _poisson(lam: f64, size: usize, seed: Option<u64>) -> PyResult<Vec<u64>> {
+    Ok(distributions::poisson(lam, size, seed))
+}
+
+#[pyfunction]
 fn _trapezoidal_auc(df: PyDataFrame) -> PyResult<f64> {
     let df: DataFrame = df.into();
 
@@ -203,6 +208,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_bca_interval, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_ppf, m)?)?;
     m.add_function(wrap_pyfunction!(_norm_cdf, m)?)?;
+    m.add_function(wrap_pyfunction!(_poisson, m)?)?;
     m.add_function(wrap_pyfunction!(_rectangular_auc, m)?)?;
     m.add_function(wrap_pyfunction!(_trapezoidal_auc, m)?)?;
 
