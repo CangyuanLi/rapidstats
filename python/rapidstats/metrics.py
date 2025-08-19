@@ -698,8 +698,8 @@ def _set_loop_strategy(
     return strategy
 
 
-def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
-    """Compute basic confusion matrix.
+def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrame) -> PolarsFrame:
+    """Compute basic confusion matrix. Assumes that it is sorted.
 
     Parameters
     ----------
@@ -712,8 +712,7 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
         A frame of `threshold`, `tn`, `fp`, `fn`, and `tp`
     """
     return (
-        pf.sort("threshold", descending=True)
-        .with_columns(
+        pf.with_columns(
             (pl.col("y_true") * pl.col("sample_weight")).cum_sum().alias("tp"),
             (pl.col("y_true").not_() * pl.col("sample_weight")).cum_sum().alias("fp"),
         )
@@ -735,6 +734,12 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
             pl.col("fp").add(pl.col("tn")).alias("n"),
         )
         .select("threshold", "tn", "fp", "fn", "tp")
+    )
+
+
+def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+    return pf.sort("threshold", descending=True).pipe(
+        _base_confusion_matrix_at_thresholds_sorted
     )
 
 

@@ -36,6 +36,7 @@ testpaths = ["tests"]
 repeat = 50
 number = 1
 warmups = 1
+garbage_collection = true
 
 [tool.isort]
 profile = "black"

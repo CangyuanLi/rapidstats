@@ -44,6 +44,7 @@ from .metrics import (
     _air_at_thresholds_core,
     _ap_from_pr_curve,
     _base_confusion_matrix_at_thresholds,
+    _base_confusion_matrix_at_thresholds_sorted,
     _full_confusion_matrix_from_base,
     _map_to_thresholds,
     _set_loop_strategy,
@@ -269,6 +270,10 @@ def _poisson_sample(
         .drop_nulls("index")
         .drop("index", "repeats")
     )
+
+
+def _multinomial_sample(df: pl.DataFrame, seed: Optional[int]) -> pl.DataFrame:
+    return df.sample(fraction=1, with_replacement=True, seed=seed)
 
 
 def _poisson_bs_func(i, df, df_height, stat_func):
@@ -617,8 +622,10 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_score_to_df(y_true, y_score, sample_weight).rename(
-            {"y_score": "threshold"}
+        df = (
+            _y_true_y_score_to_df(y_true, y_score, sample_weight)
+            .rename({"y_score": "threshold"})
+            .sort("threshold", descending=True)
         )
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
@@ -646,10 +653,18 @@ class Bootstrap:
             if thresholds is None:
                 thresholds = df["threshold"].unique()
 
+            if self._params["poisson"]:
+                _matrix_func = _base_confusion_matrix_at_thresholds_sorted
+                _sample_func = functools.partial(_poisson_sample, df_height=df.height)
+                df = df.lazy()
+            else:
+                _matrix_func = _base_confusion_matrix_at_thresholds
+                _sample_func = _multinomial_sample
+
             def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
                 return (
                     pf.lazy()
-                    .pipe(_base_confusion_matrix_at_thresholds)
+                    .pipe(_matrix_func)
                     .pipe(_full_confusion_matrix_from_base, beta=beta)
                     .unique("threshold")
                     .pipe(_map_to_thresholds, thresholds)
@@ -657,7 +672,7 @@ class Bootstrap:
                 )
 
             def _cm(i: int) -> pl.LazyFrame:
-                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+                sample_df = _sample_func(df, seed=i)
 
                 return _cm_inner(sample_df)
 
