@@ -461,7 +461,7 @@ def adverse_impact_ratio(
     )
 
 
-def _air_at_thresholds_core(
+def _air_at_thresholds_core_sorted(
     pf: PolarsFrame,
     thresholds: Optional[list[float]],
     has_sample_weight: bool,
@@ -470,7 +470,6 @@ def _air_at_thresholds_core(
         # An approve is score < t
         return (
             pf.lazy()
-            .sort("y_score", descending=False)
             .with_row_index("cumulative_approved")
             .with_columns(
                 pl.col("cumulative_approved").truediv(pl.len()).alias("appr_rate")
@@ -483,7 +482,6 @@ def _air_at_thresholds_core(
         # An approve is score < t
         return (
             pf.lazy()
-            .sort("y_score", descending=False)
             .with_columns(
                 pl.col("sample_weight")
                 .shift(1, fill_value=0.0)
@@ -542,6 +540,16 @@ def _air_at_thresholds_core(
         )
         .select("threshold", "air")
     )
+
+
+def _air_at_thresholds_core(
+    pf: PolarsFrame,
+    thresholds: Optional[list[float]],
+    has_sample_weight: bool,
+) -> pl.LazyFrame:
+    pf = pf.sort("y_score", descending=False)
+
+    return _air_at_thresholds_core_sorted(pf, thresholds, has_sample_weight)
 
 
 def adverse_impact_ratio_at_thresholds(
