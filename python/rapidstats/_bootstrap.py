@@ -42,6 +42,7 @@ from .metrics import (
     LoopStrategy,
     PolarsFrame,
     _air_at_thresholds_core,
+    _air_at_thresholds_core_sorted,
     _ap_from_pr_curve,
     _base_confusion_matrix_at_thresholds,
     _base_confusion_matrix_at_thresholds_sorted,
@@ -403,7 +404,8 @@ class Bootstrap:
         How to sample. If "multinomial", sample with replacement. If "poisson", simulate
         number of draws via a Poisson(1) distribution. Note that "poisson" is usually
         much more performant, especially since order is preserved, which allows certain
-        functions to avoid sorting every iteration, by default "poisson"
+        functions to avoid sorting every iteration. However, "poisson" is still in a
+        beta stage, by default "multinomial"
     seed : Optional[int], optional
         Seed that controls resampling. Set this to any integer to make results
         reproducible, by default None
@@ -435,7 +437,7 @@ class Bootstrap:
         iterations: int = 1_000,
         confidence: float = 0.95,
         method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
-        sampling_method: Literal["poisson", "multinomial"] = "poisson",
+        sampling_method: Literal["poisson", "multinomial"] = "multinomial",
         seed: Optional[int] = None,
         n_jobs: Optional[int] = None,
         chunksize: Optional[int] = None,
@@ -1089,10 +1091,18 @@ class Bootstrap:
             if thresholds is None:
                 thresholds = df["y_score"]
 
-            def _air(i: int) -> pl.LazyFrame:
-                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+            if self._params["poisson"]:
+                _air_func = _air_at_thresholds_core_sorted
+                _sample_func = functools.partial(_poisson_sample, df_height=df.height)
+                df = df.lazy()
+            else:
+                _air_func = _air_at_thresholds_core
+                _sample_func = _multinomial_sample
 
-                return _air_at_thresholds_core(sample_df, thresholds, has_sample_weight)
+            def _air(i: int) -> pl.LazyFrame:
+                sample_df = _sample_func(df, i)
+
+                return _air_func(sample_df, thresholds, has_sample_weight)
 
             airs: list[pl.LazyFrame] = _run_concurrent(
                 _air,
