@@ -154,3 +154,4 @@ temp*
 
 benchmarks/results/
 benchmarks/benchmark_data.parquet
+tests/data/credit_card_fraud.parquet
