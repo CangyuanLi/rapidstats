@@ -1100,7 +1100,7 @@ class Bootstrap:
                 _sample_func = _multinomial_sample
 
             def _air(i: int) -> pl.LazyFrame:
-                sample_df = _sample_func(df, i)
+                sample_df = _sample_func(df, seed=i)
 
                 return _air_func(sample_df, thresholds, has_sample_weight)
 
