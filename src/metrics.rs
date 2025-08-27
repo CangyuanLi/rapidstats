@@ -112,6 +112,7 @@ pub fn bootstrap_confusion_matrix(
     seed: Option<u64>,
     n_jobs: Option<usize>,
     chunksize: Option<usize>,
+    poisson: bool,
 ) -> Vec<bootstrap::ConfidenceInterval> {
     let base_cm = base_confusion_matrix(df);
 
@@ -122,6 +123,7 @@ pub fn bootstrap_confusion_matrix(
         |x| confusion_matrix(x, beta),
         n_jobs,
         chunksize,
+        poisson,
     );
     let bs_transposed = transpose_confusion_matrix_results(bootstrap_stats);
 
@@ -159,37 +161,39 @@ pub fn bootstrap_confusion_matrix(
     }
 }
 
-pub fn roc_auc(df: DataFrame) -> f64 {
-    let df = df.sort(["y_score"], Default::default()).unwrap();
-    let y_true = df["y_true"].f64().unwrap();
-    let sample_weight = df["sample_weight"].f64().unwrap();
-
-    let (auc, n_false) = y_true
-        .into_no_null_iter()
-        .zip(sample_weight.into_no_null_iter())
-        .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
-            let new_n_false = n_false + (1.0 - y_i) * w_i;
-            let new_auc = auc + y_i * w_i * new_n_false;
-            (new_auc, new_n_false)
-        });
+fn _roc_auc_sorted(y_true: &[f64], sample_weight: &[f64]) -> f64 {
+    let (auc, n_false) =
+        y_true
+            .iter()
+            .zip(sample_weight)
+            .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
+                let new_n_false = n_false + (1.0 - y_i) * w_i;
+                let new_auc = auc + y_i * w_i * new_n_false;
+                (new_auc, new_n_false)
+            });
 
     let n_true = y_true
-        .into_no_null_iter()
-        .zip(sample_weight.into_no_null_iter())
+        .iter()
+        .zip(sample_weight)
         .fold(0.0, |acc, (y_i, w_i)| acc + y_i * w_i);
 
     auc / (n_false * n_true)
+}
 
-    // let n = y_true.len() as f64;
-    // let (auc, nfalse) = y_true
-    //     .into_no_null_iter()
-    //     .fold((0.0, 0.0), |(auc, nfalse), y_i| {
-    //         let new_nfalse = nfalse + (1.0 - y_i);
-    //         let new_auc = auc + y_i * new_nfalse;
-    //         (new_auc, new_nfalse)
-    //     });
+pub fn roc_auc_sorted(df: DataFrame) -> f64 {
+    let y_true = df["y_true"].f64().unwrap();
+    let sample_weight = df["sample_weight"].f64().unwrap();
 
-    // auc / (nfalse * (n - nfalse))
+    _roc_auc_sorted(
+        y_true.cont_slice().unwrap(),
+        sample_weight.cont_slice().unwrap(),
+    )
+}
+
+pub fn roc_auc(df: DataFrame) -> f64 {
+    let df = df.sort(["y_score"], Default::default()).unwrap();
+
+    roc_auc_sorted(df)
 }
 
 // Max KS code taken largely from https://github.com/abstractqqq/polars_ds_extension/blob/main/src/stats/ks.rs

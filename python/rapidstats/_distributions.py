@@ -1,4 +1,6 @@
-from ._rustystats import _norm_cdf, _norm_ppf
+from typing import Optional
+
+from ._rustystats import _norm_cdf, _norm_ppf, _poisson
 
 
 class norm:
@@ -45,3 +47,19 @@ class norm:
         -----------------------
         """
         return _norm_cdf(x)
+
+
+class Random:
+    def __init__(self, seed: Optional[int]):
+        self.seed = seed
+
+    def _increment_seed(self):
+        if self.seed is not None:
+            self.seed += 1
+
+    def poisson(self, lam: float, size: int) -> list[int]:
+        res = _poisson(lam=lam, size=size, seed=self.seed)
+
+        self._increment_seed()
+
+        return res

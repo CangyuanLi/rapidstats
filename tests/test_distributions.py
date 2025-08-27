@@ -20,3 +20,17 @@ def test_norm_cdf(q: float):
     rs = rapidstats.norm.cdf(q)
 
     assert pytest.approx(ref) == rs
+
+
+def test_random_seed_sequence():
+    r = rapidstats.Random(208)
+    run1 = r.poisson(1, 100)
+    run2 = r.poisson(1, size=100)
+
+    assert not (pytest.approx(run1) == run2)
+
+
+def test_random_reproducible():
+    assert pytest.approx(rapidstats.Random(208).poisson(1, 100)) == rapidstats.Random(
+        208
+    ).poisson(1, 100)

@@ -165,7 +165,12 @@ def test_bootstrap_f1(y_true, y_pred):
     ref_res = []
     for i in range(20):
         res = (
-            rs.Bootstrap(iterations=BOOTSTRAP_ITERATIONS, seed=SEED + i)
+            rs.Bootstrap(
+                iterations=BOOTSTRAP_ITERATIONS,
+                method="percentile",
+                sampling_method="multinomial",
+                seed=SEED + i,
+            )
             .confusion_matrix(y_true, y_pred)
             .fbeta
         )

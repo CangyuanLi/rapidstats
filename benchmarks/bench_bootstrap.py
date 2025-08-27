@@ -15,6 +15,9 @@ ITERATIONS = 100
 METHOD = "percentile"
 SEED = 208
 BS = rs.Bootstrap(iterations=ITERATIONS, method=METHOD, seed=SEED)
+BS_MULTINOMIAL = rs.Bootstrap(
+    iterations=ITERATIONS, method=METHOD, sampling_method="multinomial", seed=SEED
+)
 
 DF = (
     pl.scan_parquet(BASE_PATH / "benchmark_data.parquet")
@@ -23,11 +26,19 @@ DF = (
     .collect()
 )
 
+DF_SMALL = DF.head(1_000)
+
 
 @pybench.metadata(group="bootstrap_roc_auc")
 @pybench.config(repeat=10)
 def bench_bootstrap_roc_auc():
     BS.roc_auc(DF["y_true"], DF["y_score"])
+
+
+@pybench.metadata(group="bootstrap_roc_auc")
+@pybench.config(repeat=10)
+def bench_bootstrap_multinomial_roc_auc():
+    BS_MULTINOMIAL.roc_auc(DF["y_true"], DF["y_score"])
 
 
 @pybench.metadata(group="bootstrap_roc_auc")
@@ -58,3 +69,19 @@ def bench_python_multithreaded_bootstrap_roc_auc():
         rs._bootstrap._percentile_interval(
             bootstrap_stats=bootstrap_stats, alpha=(1 - 0.95) / 2
         )
+
+
+@pybench.metadata(group="bootstrap_confusion_matrix_at_thresholds")
+@pybench.config(repeat=5)
+def bench_bootstrap_confusion_matrix_at_thresholds():
+    BS.confusion_matrix_at_thresholds(
+        y_true=DF_SMALL["y_true"], y_score=DF_SMALL["y_score"]
+    )
+
+
+@pybench.metadata(group="bootstrap_confusion_matrix_at_thresholds")
+@pybench.config(repeat=5)
+def bench_bootstrap_multinomial_confusion_matrix_at_thresholds():
+    BS_MULTINOMIAL.confusion_matrix_at_thresholds(
+        DF_SMALL["y_true"], DF_SMALL["y_score"]
+    )

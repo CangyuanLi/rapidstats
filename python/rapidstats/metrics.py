@@ -202,7 +202,9 @@ def confusion_matrix(
     Added in version 0.1.0
     ----------------------
     """
-    df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
+    df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight).with_columns(
+        pl.col("y_true").cast(pl.UInt8)
+    )
 
     return ConfusionMatrix(*_confusion_matrix(df, beta))
 
@@ -459,7 +461,7 @@ def adverse_impact_ratio(
     )
 
 
-def _air_at_thresholds_core(
+def _air_at_thresholds_core_sorted(
     pf: PolarsFrame,
     thresholds: Optional[list[float]],
     has_sample_weight: bool,
@@ -468,7 +470,6 @@ def _air_at_thresholds_core(
         # An approve is score < t
         return (
             pf.lazy()
-            .sort("y_score", descending=False)
             .with_row_index("cumulative_approved")
             .with_columns(
                 pl.col("cumulative_approved").truediv(pl.len()).alias("appr_rate")
@@ -481,7 +482,6 @@ def _air_at_thresholds_core(
         # An approve is score < t
         return (
             pf.lazy()
-            .sort("y_score", descending=False)
             .with_columns(
                 pl.col("sample_weight")
                 .shift(1, fill_value=0.0)
@@ -540,6 +540,16 @@ def _air_at_thresholds_core(
         )
         .select("threshold", "air")
     )
+
+
+def _air_at_thresholds_core(
+    pf: PolarsFrame,
+    thresholds: Optional[list[float]],
+    has_sample_weight: bool,
+) -> pl.LazyFrame:
+    pf = pf.sort("y_score", descending=False)
+
+    return _air_at_thresholds_core_sorted(pf, thresholds, has_sample_weight)
 
 
 def adverse_impact_ratio_at_thresholds(
@@ -696,8 +706,8 @@ def _set_loop_strategy(
     return strategy
 
 
-def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
-    """Compute basic confusion matrix.
+def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrame) -> PolarsFrame:
+    """Compute basic confusion matrix. Assumes that it is sorted.
 
     Parameters
     ----------
@@ -710,8 +720,7 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
         A frame of `threshold`, `tn`, `fp`, `fn`, and `tp`
     """
     return (
-        pf.sort("threshold", descending=True)
-        .with_columns(
+        pf.with_columns(
             (pl.col("y_true") * pl.col("sample_weight")).cum_sum().alias("tp"),
             (pl.col("y_true").not_() * pl.col("sample_weight")).cum_sum().alias("fp"),
         )
@@ -733,6 +742,12 @@ def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
             pl.col("fp").add(pl.col("tn")).alias("n"),
         )
         .select("threshold", "tn", "fp", "fn", "tp")
+    )
+
+
+def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+    return pf.sort("threshold", descending=True).pipe(
+        _base_confusion_matrix_at_thresholds_sorted
     )
 
 

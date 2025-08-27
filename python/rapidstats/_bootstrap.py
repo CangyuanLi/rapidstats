@@ -11,7 +11,7 @@ from polars.lazyframe.group_by import LazyGroupBy
 from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
-from ._distributions import norm
+from ._distributions import Random, norm
 from ._rustystats import (
     _basic_interval,
     _bca_interval,
@@ -23,6 +23,7 @@ from ._rustystats import (
     _bootstrap_mean_squared_error,
     _bootstrap_r2,
     _bootstrap_roc_auc,
+    _bootstrap_roc_auc_sorted,
     _bootstrap_root_mean_squared_error,
     _percentile_interval,
     _standard_interval,
@@ -41,8 +42,10 @@ from .metrics import (
     LoopStrategy,
     PolarsFrame,
     _air_at_thresholds_core,
+    _air_at_thresholds_core_sorted,
     _ap_from_pr_curve,
     _base_confusion_matrix_at_thresholds,
+    _base_confusion_matrix_at_thresholds_sorted,
     _full_confusion_matrix_from_base,
     _map_to_thresholds,
     _set_loop_strategy,
@@ -255,6 +258,29 @@ def _bca_interval_polars(
     )
 
 
+def _poisson_sample(
+    pf: PolarsFrame, df_height: int, seed: Optional[int]
+) -> PolarsFrame:
+    repeats = pl.Series("repeats", Random(seed).poisson(1, size=df_height))
+
+    return (
+        pf.with_row_index("index")
+        .with_columns(repeats)
+        .with_columns(pl.col("index").repeat_by("repeats"))
+        .explode("index")
+        .drop_nulls("index")
+        .drop("index", "repeats")
+    )
+
+
+def _multinomial_sample(df: pl.DataFrame, seed: Optional[int]) -> pl.DataFrame:
+    return df.sample(fraction=1, with_replacement=True, seed=seed)
+
+
+def _poisson_bs_func(i, df, df_height, stat_func):
+    return stat_func(_poisson_sample(df, df_height, seed=i))
+
+
 class Bootstrap:
     r"""Computes a two-sided bootstrap confidence interval of a statistic. Note that
     \( \alpha \) is then defined as \( \frac{1 - \text{confidence}}{2} \). Regardless
@@ -374,6 +400,12 @@ class Bootstrap:
     method : Literal["standard", "percentile", "basic", "BCa"], optional
         Whether to return the Percentile, Basic / Reverse Percentile, or
         Bias Corrected and Accelerated Interval, by default "percentile"
+    sampling_method: Literal["poisson", "multinomial"], optional
+        How to sample. If "multinomial", sample with replacement. If "poisson", simulate
+        number of draws via a Poisson(1) distribution. Note that "poisson" is usually
+        much more performant, especially since order is preserved, which allows certain
+        functions to avoid sorting every iteration. However, "poisson" is still in a
+        beta stage, by default "multinomial"
     seed : Optional[int], optional
         Seed that controls resampling. Set this to any integer to make results
         reproducible, by default None
@@ -388,6 +420,8 @@ class Bootstrap:
     ------
     ValueError
         If the method is not one of `standard`, `percentile`, `basic`, or `BCa`
+    ValueError
+        If the sampling method is not one of `poisson` or `multinomial`
 
     Examples
     --------
@@ -403,6 +437,7 @@ class Bootstrap:
         iterations: int = 1_000,
         confidence: float = 0.95,
         method: Literal["standard", "percentile", "basic", "BCa"] = "percentile",
+        sampling_method: Literal["poisson", "multinomial"] = "multinomial",
         seed: Optional[int] = None,
         n_jobs: Optional[int] = None,
         chunksize: Optional[int] = None,
@@ -412,11 +447,17 @@ class Bootstrap:
                 f"Invalid confidence interval method `{method}`, only `standard`, `percentile`, `basic`, and `BCa` are supported",
             )
 
+        if sampling_method not in ("poisson", "multinomial"):
+            raise ValueError(
+                f"Invalid sampling method `{sampling_method}`, only `poisson` and `multinomial` are supported"
+            )
+
         self.iterations = iterations
         self.confidence = confidence
         self.seed = seed
         self.alpha = (1 - confidence) / 2
         self.method = method
+        self.sampling_method = sampling_method
         self.n_jobs = n_jobs
         self.chunksize = chunksize
 
@@ -427,6 +468,7 @@ class Bootstrap:
             "seed": self.seed,
             "n_jobs": self.n_jobs,
             "chunksize": self.chunksize,
+            "poisson": self.sampling_method == "poisson",
         }
 
     def run(
@@ -456,7 +498,12 @@ class Bootstrap:
             if k not in kwargs:
                 kwargs[k] = v
 
-        func = functools.partial(_bs_func, df=df, stat_func=stat_func)
+        if self._params["poisson"]:
+            func = functools.partial(
+                _poisson_bs_func, df=df, df_height=df.height, stat_func=stat_func
+            )
+        else:
+            func = functools.partial(_bs_func, df=df, stat_func=stat_func)
 
         if self.seed is None:
             iterable = (None for _ in range(self.iterations))
@@ -522,7 +569,9 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight)
+        df = _y_true_y_pred_to_df(y_true, y_pred, sample_weight).with_columns(
+            pl.col("y_true").cast(pl.UInt8)
+        )
 
         return BootstrappedConfusionMatrix(
             *_bootstrap_confusion_matrix(df, beta, **self._params)
@@ -575,8 +624,10 @@ class Bootstrap:
         Added in version 0.1.0
         ----------------------
         """
-        df = _y_true_y_score_to_df(y_true, y_score, sample_weight).rename(
-            {"y_score": "threshold"}
+        df = (
+            _y_true_y_score_to_df(y_true, y_score, sample_weight)
+            .rename({"y_score": "threshold"})
+            .sort("threshold", descending=True)
         )
         final_cols = ["threshold", "metric", "lower", "mean", "upper"]
 
@@ -604,10 +655,18 @@ class Bootstrap:
             if thresholds is None:
                 thresholds = df["threshold"].unique()
 
+            if self._params["poisson"]:
+                _matrix_func = _base_confusion_matrix_at_thresholds_sorted
+                _sample_func = functools.partial(_poisson_sample, df_height=df.height)
+                df = df.lazy()
+            else:
+                _matrix_func = _base_confusion_matrix_at_thresholds
+                _sample_func = _multinomial_sample
+
             def _cm_inner(pf: PolarsFrame) -> pl.LazyFrame:
                 return (
                     pf.lazy()
-                    .pipe(_base_confusion_matrix_at_thresholds)
+                    .pipe(_matrix_func)
                     .pipe(_full_confusion_matrix_from_base, beta=beta)
                     .unique("threshold")
                     .pipe(_map_to_thresholds, thresholds)
@@ -615,7 +674,7 @@ class Bootstrap:
                 )
 
             def _cm(i: int) -> pl.LazyFrame:
-                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+                sample_df = _sample_func(df, seed=i)
 
                 return _cm_inner(sample_df)
 
@@ -733,7 +792,13 @@ class Bootstrap:
             pl.col("y_true").cast(pl.Float64)
         )
 
-        return _bootstrap_roc_auc(df, **self._params)
+        if self._params["poisson"]:
+            df = df.sort("y_score")
+            _f = _bootstrap_roc_auc_sorted
+        else:
+            _f = _bootstrap_roc_auc
+
+        return _f(df, **self._params)
 
     def average_precision(
         self,
@@ -1026,10 +1091,18 @@ class Bootstrap:
             if thresholds is None:
                 thresholds = df["y_score"]
 
-            def _air(i: int) -> pl.LazyFrame:
-                sample_df = df.sample(fraction=1, with_replacement=True, seed=i)
+            if self._params["poisson"]:
+                _air_func = _air_at_thresholds_core_sorted
+                _sample_func = functools.partial(_poisson_sample, df_height=df.height)
+                df = df.lazy()
+            else:
+                _air_func = _air_at_thresholds_core
+                _sample_func = _multinomial_sample
 
-                return _air_at_thresholds_core(sample_df, thresholds, has_sample_weight)
+            def _air(i: int) -> pl.LazyFrame:
+                sample_df = _sample_func(df, seed=i)
+
+                return _air_func(sample_df, thresholds, has_sample_weight)
 
             airs: list[pl.LazyFrame] = _run_concurrent(
                 _air,

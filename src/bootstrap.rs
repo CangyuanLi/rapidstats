@@ -1,8 +1,8 @@
+use crate::distributions::{self, poisson};
 use polars::prelude::*;
+
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
-
-use crate::distributions;
 
 pub type ConfidenceInterval = (f64, f64, f64);
 
@@ -77,25 +77,16 @@ impl VecUtils for Vec<f64> {
     }
 }
 
-// fn _compare(
-//     arr1: Vec<&str>,
-//     arr2: Vec<&str>,
-//     func_name: &str,
-//     n_jobs: usize,
-//     quiet: bool,
-// ) -> PyResult<Vec<f64>> {
-//     let func = func_dispatcher(func_name);
+// fn repeat<T: Copy>(a: &[T], repeats: &[u64], capacity: usize) -> Vec<T> {
+//     let mut res: Vec<T> = Vec::with_capacity(capacity);
 
-//     let arr1 = arr1.as_slice();
-//     let arr2 = arr2.as_slice();
-
-//     if n_jobs == 0 {
-//         Ok(fuzzycompare(arr1, arr2, func, quiet))
-//     } else if n_jobs == 1 {
-//         Ok(fuzzycompare_sequential(arr1, arr2, func, quiet))
-//     } else {
-//         Ok(utils::create_rayon_pool(n_jobs)?.install(|| fuzzycompare(arr1, arr2, func, quiet)))
+//     for value in a.iter().copied() {
+//         for _ in repeats {
+//             res.push(value);
+//         }
 //     }
+
+//     res
 // }
 
 fn create_rayon_pool(n_jobs: usize) -> rayon::ThreadPool {
@@ -105,12 +96,31 @@ fn create_rayon_pool(n_jobs: usize) -> rayon::ThreadPool {
         .unwrap()
 }
 
+fn sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
+    df.sample_n_literal(df_height, true, false, seed).unwrap()
+}
+
+fn poisson_sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
+    let repeats = Series::new("repeats".into(), poisson(1.0, df_height, seed));
+
+    df.lazy()
+        .with_row_index("index", Some(0))
+        .with_column(repeats.lit())
+        .with_column(col("index").repeat_by(col("repeats")))
+        .explode(["index"])
+        .drop_nulls(Some(vec![col("index")]))
+        .drop(["index", "repeats"])
+        .collect()
+        .unwrap()
+}
+
 fn bootstrap_core<T: Send + Sync, F>(
     df: DataFrame,
     iterations: u64,
     seed: Option<u64>,
     func: F,
     chunksize: Option<usize>,
+    poisson: bool,
 ) -> Vec<T>
 where
     F: Fn(DataFrame) -> T + Send + Sync,
@@ -119,14 +129,17 @@ where
 
     let seeds: Vec<u64> = (0..iterations).collect();
 
+    let sample_func = if poisson { poisson_sample } else { sample };
+
     let res: Vec<T> = if chunksize.is_none() {
         seeds
             .par_iter()
             .map(|i| {
-                func(
-                    df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
-                        .unwrap(),
-                )
+                func(sample_func(
+                    df.clone(),
+                    df_height,
+                    seed.map(|seed| seed + i),
+                ))
             })
             .collect()
     } else {
@@ -136,11 +149,12 @@ where
             .flat_map(|chunk| {
                 chunk
                     .iter()
-                    .map(|&i| {
-                        func(
-                            df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
-                                .unwrap(),
-                        )
+                    .map(|i| {
+                        func(sample_func(
+                            df.clone(),
+                            df_height,
+                            seed.map(|seed| seed + i),
+                        ))
                     })
                     .collect::<Vec<T>>()
             })
@@ -157,26 +171,29 @@ pub fn run_bootstrap<T: Send + Sync, F>(
     func: F,
     n_jobs: Option<usize>,
     chunksize: Option<usize>,
+    poisson: bool,
 ) -> Vec<T>
 where
     F: Fn(DataFrame) -> T + Send + Sync,
 {
     let df_height = df.height();
+    let sample_func = if poisson { poisson_sample } else { sample };
 
     let bootstrap_stats: Vec<T> = if n_jobs == Some(1) {
         (0..iterations)
             .map(|i| {
-                func(
-                    df.sample_n_literal(df_height, true, false, seed.map(|seed| seed + i))
-                        .unwrap(),
-                )
+                func(sample_func(
+                    df.clone(),
+                    df_height,
+                    seed.map(|seed| seed + i),
+                ))
             })
             .collect()
     } else if n_jobs.is_none() {
-        bootstrap_core(df, iterations, seed, func, chunksize)
+        bootstrap_core(df, iterations, seed, func, chunksize, poisson)
     } else {
         create_rayon_pool(n_jobs.unwrap())
-            .install(|| bootstrap_core(df, iterations, seed, func, chunksize))
+            .install(|| bootstrap_core(df, iterations, seed, func, chunksize, poisson))
     };
 
     bootstrap_stats

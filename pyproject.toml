@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = ["polars>=1.0.0,!=1.26.0", "narwhals>=1.0.0", "tqdm"]
+dependencies = ["polars>=1.0.0,!=1.26.0,!=1.32.3", "narwhals>=1.0.0", "tqdm"]
 
 [project.optional-dependencies]
 pyarrow = ["pyarrow >= 7.0.0"]
@@ -36,6 +36,7 @@ testpaths = ["tests"]
 repeat = 50
 number = 1
 warmups = 1
+garbage_collection = true
 
 [tool.isort]
 profile = "black"
