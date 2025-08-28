@@ -1,1 +1,1 @@
-Before suggesting a code change, always try and test it first. For example, if making a change to "confusion_matrix", run "test_confusion_matrix" to validate your change. If new functionality, first write your own test.
+Before suggesting a code change, always try and test it first using pytest (no need to run tox, as it takes a while). For example, if making a change to "confusion_matrix", run "test_confusion_matrix" to validate your change. If new functionality, first write your own test.
