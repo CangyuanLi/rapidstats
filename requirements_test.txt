@@ -1,9 +1,0 @@
-catboost
-lightgbm
-narwhals
-pandas
-pyarrow>=7.0.0
-pytest
-scikit-learn
-scipy
-xgboost
