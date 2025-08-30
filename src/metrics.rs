@@ -127,30 +127,32 @@ pub fn bootstrap_confusion_matrix(
     );
     let bs_transposed = transpose_confusion_matrix_results(bootstrap_stats);
 
+    let original_stat = confusion_matrix(base_cm.clone(), beta);
+
     if method == "standard" {
         bs_transposed
             .into_iter()
-            .map(|bs| bootstrap::standard_interval(bs, alpha))
+            .zip(original_stat)
+            .map(|(bs, o)| bootstrap::standard_interval(o, bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "percentile" {
         bs_transposed
             .into_iter()
-            .map(|bs| bootstrap::percentile_interval(bs, alpha))
+            .zip(original_stat)
+            .map(|(bs, o)| bootstrap::percentile_interval(o, bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "basic" {
-        let original_stats = confusion_matrix(base_cm.clone(), beta);
-
-        original_stats
+        original_stat
             .into_iter()
             .zip(bs_transposed)
             .map(|(original_stat, bs)| bootstrap::basic_interval(original_stat, bs, alpha))
             .collect::<Vec<bootstrap::ConfidenceInterval>>()
     } else if method == "BCa" {
-        let original_stats = confusion_matrix(base_cm.clone(), beta);
-        let jacknife_stats = bootstrap::run_jacknife(base_cm, |x| confusion_matrix(x, beta));
+        let jacknife_stats =
+            bootstrap::run_jacknife(base_cm.clone(), |x| confusion_matrix(x, beta));
         let js_transposed = transpose_confusion_matrix_results(jacknife_stats);
 
-        original_stats
+        original_stat
             .into_iter()
             .zip(bs_transposed)
             .zip(js_transposed)

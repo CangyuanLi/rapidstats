@@ -38,18 +38,17 @@ macro_rules! generate_functions {
                 poisson: bool,
             ) -> PyResult<bootstrap::ConfidenceInterval> {
                 let df: DataFrame = df.into();
+                let original_stat = $metric_func(df.clone());
                 let bootstrap_stats =
                     bootstrap::run_bootstrap(df.clone(), iterations, seed, $metric_func, n_jobs, chunksize, poisson);
                 if method == "standard" {
-                    Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
+                    Ok(bootstrap::standard_interval(original_stat, bootstrap_stats, alpha))
                 }
                 else if method == "percentile" {
-                    Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
+                    Ok(bootstrap::percentile_interval(original_stat, bootstrap_stats, alpha))
                 } else if method == "basic" {
-                    let original_stat = $metric_func(df.clone());
                     Ok(bootstrap::basic_interval(original_stat, bootstrap_stats, alpha))
                 } else if method == "BCa" {
-                    let original_stat = $metric_func(df.clone());
                     let jacknife_stats = bootstrap::run_jacknife(df, $metric_func);
                     Ok(bootstrap::bca_interval(
                         original_stat,
@@ -107,13 +106,29 @@ generate_functions!(_root_mean_squared_error, metrics::root_mean_squared_error);
 generate_functions!(_r2, metrics::r2);
 
 #[pyfunction]
-fn _standard_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
-    Ok(bootstrap::standard_interval(bootstrap_stats, alpha))
+fn _standard_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::standard_interval(
+        original_stat,
+        bootstrap_stats,
+        alpha,
+    ))
 }
 
 #[pyfunction]
-fn _percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> PyResult<ConfidenceInterval> {
-    Ok(bootstrap::percentile_interval(bootstrap_stats, alpha))
+fn _percentile_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> PyResult<ConfidenceInterval> {
+    Ok(bootstrap::percentile_interval(
+        original_stat,
+        bootstrap_stats,
+        alpha,
+    ))
 }
 
 #[pyfunction]

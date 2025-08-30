@@ -213,23 +213,30 @@ where
     jacknife_stats
 }
 
-pub fn standard_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceInterval {
+pub fn standard_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> ConfidenceInterval {
     let runs = bootstrap_stats.drop_nans();
     let mean = runs.mean();
     let stderr = runs.std();
     let z = distributions::norm_ppf(1.0 - alpha);
     let x = z * stderr;
 
-    (mean - x, mean, mean + x)
+    (mean - x, original_stat, mean + x)
 }
 
-pub fn percentile_interval(bootstrap_stats: Vec<f64>, alpha: f64) -> ConfidenceInterval {
+pub fn percentile_interval(
+    original_stat: f64,
+    bootstrap_stats: Vec<f64>,
+    alpha: f64,
+) -> ConfidenceInterval {
     let runs = bootstrap_stats.drop_nans();
-    let mean = runs.mean();
 
     (
         runs.percentile(alpha * 100.0),
-        mean,
+        original_stat,
         runs.percentile((1.0 - alpha) * 100.0),
     )
 }
@@ -239,14 +246,13 @@ pub fn basic_interval(
     bootstrap_stats: Vec<f64>,
     alpha: f64,
 ) -> ConfidenceInterval {
-    let interval = percentile_interval(bootstrap_stats, alpha);
+    let interval = percentile_interval(original_stat, bootstrap_stats, alpha);
     let lower = interval.0;
-    let mean = interval.1;
     let upper = interval.2;
 
     let x = 2.0 * original_stat;
 
-    (x - upper, mean, x - lower)
+    (x - upper, original_stat, x - lower)
 }
 
 fn percentile_of_score(arr: &[f64], score: f64) -> f64 {
@@ -294,7 +300,7 @@ pub fn bca_interval(
 
     (
         bootstrap_stats.percentile(lower_p * 100.0),
-        bootstrap_stats.mean(),
+        original_stat,
         bootstrap_stats.percentile(upper_p * 100.0),
     )
 }
