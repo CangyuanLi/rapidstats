@@ -10,7 +10,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = ["polars>=1.0.0,!=1.26.0,!=1.32.3", "narwhals>=1.0.0", "tqdm"]
+dependencies = [
+    # 1.26.0 https://github.com/pola-rs/polars/issues/21913
+    # 1.32.2 https://github.com/pola-rs/polars/issues/23965
+    # 1.32.3 can't find issue but something broke plugins
+    "polars>=1.0.0,!=1.26.0,!=1.32.2,!=1.32.3",
+    "narwhals>=1.0.0",
+    "tqdm",
+]
 
 [project.optional-dependencies]
 pyarrow = ["pyarrow >= 7.0.0"]
@@ -43,10 +50,7 @@ docs = [
     "pymdown-extensions>=10.16.1",
     "pytkdocs[numpy-style]>=0.16.5",
 ]
-tests-tox = [
-    "tox>=4.29.0",
-    "tox-gh-actions>=3.3.0",
-]
+tests-tox = ["tox>=4.29.0", "tox-gh-actions>=3.3.0"]
 dev = [
     "ruff",
     "mypy",
