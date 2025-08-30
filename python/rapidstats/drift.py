@@ -175,6 +175,51 @@ def psi(
     include_nulls: bool = True,
     epsilon: float | None = 1e-4,
 ) -> float:
+    r"""Calculates the Population Stability Index (PSI) between two populations. PSI is
+    defined as
+
+    \[
+        PSI = \sum_{i=1}^{n} (\% \text{Current}_{i} - \% \text{Reference}_{i}) \times \ln\left(\frac{\% \text{Current}_{i}}{\% \text{Reference}_{i}}\right)
+    \]
+
+    That is, bin the reference population and compute the percentage of the overall
+    population in each bin. Take the breakpoints from the reference population and
+    bin the current population, and repeat the process. If the bin percentage is 0, add
+    $\epsilon$ to penalize that bin while preserving the validity of the log.
+
+    Parameters
+    ----------
+    reference : ArrayLike
+        The reference population. The bins are always determined on this pouplation.
+    current : ArrayLike
+        The current population. This population is binned using the breakpoints from the
+        reference population.
+    bins : list[float] | None, optional
+        A list of bin edges. Either `bins` or `bin_count` must be specified. The `bins`
+        argument will take priority, by default None
+    bin_count : int | BinMethod, optional
+        If an integer, the number of bins. It can also be a string corresponding to an
+        auto-binning method, by default "fd". The possible methods are
+
+        - "doane", see [rapidstats.bin.doane][]
+        - "fd", see [rapidstats.bin.freedman_diaconis][]
+        - "rice", see [rapidstats.bin.rice][]
+        - "sturges", see [rapidstats.bin.sturges][]
+        - "scott", see [rapidstats.bin.scott][]
+        - "sqrt", see [rapidstats.bin.sqrt][]
+
+    include_nulls : bool, optional
+        Whether nulls should be considered a bin, by default True
+    epsilon : float | None, optional
+        The correction term to add to 0 percentages, by default 1e-4
+
+    Returns
+    -------
+    float
+
+    Added in version 0.3.0
+    ----------------------
+    """
     reference = pl.Series("reference", reference)
     current = pl.Series("current", current)
 

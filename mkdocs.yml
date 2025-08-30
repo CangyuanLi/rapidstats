@@ -6,9 +6,11 @@ use_directory_urls: false
 
 nav:
 - Home: index.md
+- Binning: bin.md
 - Bootstrap: bootstrap.md
 - Correlation: correlation.md
 - Distributions: distributions.md
+- Drift: drift.md
 - Metrics: metrics.md
 - Polars: polars.md
 - Preprocessing: preprocessing.md
