@@ -28,11 +28,13 @@ fn pl_auc(inputs: &[Series]) -> PolarsResult<Series> {
 
     let is_trapezoidal = inputs[2].bool()?.get(0).unwrap();
 
-    let df = df!(
+    let mut df = df!(
         "x" => x,
         "y" => y,
     )?
     .sort(["x"], Default::default())?;
+
+    df.rechunk_mut();
 
     let x = df["x"].f64()?.cont_slice()?;
     let y = df["y"].f64()?.cont_slice()?;

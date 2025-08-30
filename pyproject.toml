@@ -10,12 +10,32 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = ["polars>=1.0.0,!=1.26.0,!=1.32.3", "narwhals>=1.0.0", "tqdm"]
+dependencies = [
+    # 1.26.0 https://github.com/pola-rs/polars/issues/21913
+    # 1.32.2 https://github.com/pola-rs/polars/issues/23965
+    # 1.32.3 can't find issue but something broke plugins
+    "polars>=1.0.0,!=1.26.0,!=1.32.2,!=1.32.3",
+    "narwhals>=1.0.0",
+    "tqdm",
+]
 
 [project.optional-dependencies]
 pyarrow = ["pyarrow >= 7.0.0"]
 
 [dependency-groups]
+tests = [
+    "pytest",
+    "polars",
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "scipy>=1.13.1",
+    "catboost>=1.2.8",
+    "lightgbm>=4.6.0",
+    "scikit-learn>=1.6.1",
+    "xgboost>=2.1.4",
+    { include-group = "tests-tox" },
+]
 typing = ["typing_extensions"]
 docs = [
     "mkdocs==1.6.1",
@@ -27,8 +47,10 @@ docs = [
     "mkdocstrings==0.30.0",
     "mkdocstrings-python==1.18.2",
     "mike==2.1.3",
+    "pymdown-extensions>=10.16.1",
+    "pytkdocs[numpy-style]>=0.16.5",
 ]
-tests = ["pytest", "polars", "pandas", "pyarrow", "numpy", "tox>=4.29.0"]
+tests-tox = ["tox>=4.29.0", "tox-gh-actions>=3.3.0"]
 dev = [
     "ruff",
     "mypy",
@@ -38,6 +60,7 @@ dev = [
     "toml>=0.10.2",
     "types-toml>=0.10.8.20240310",
     "pre-commit>=4.3.0",
+    "patchelf>=0.17.2.4",
     { include-group = "docs" },
     { include-group = "typing" },
     { include-group = "tests" },
@@ -57,6 +80,9 @@ features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "rapidstats._rustystats"
 
+[tool.mypy]
+allow_redefinition = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -71,3 +97,15 @@ profile = "black"
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402", "F401"]
+
+
+[tool.tox]
+env_list = ["py39", "py310", "py311", "py312", "py313"]
+isolated_build = true
+
+[tool.tox.testenv]
+set_env = { PYTHONPATH = "{tox_dir}" }
+commands = ["pytest --basetemp={env_tmp_dir}"]
+
+[tool.tox.env_run_base]
+dependency_groups = ["tests"]

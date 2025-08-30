@@ -62,7 +62,7 @@ class BootstrappedConfusionMatrix:
 
     See [rapidstats.metrics.ConfusionMatrix][] for a detailed breakdown of the attributes stored in
     this class. However, instead of storing the statistic, it stores the bootstrapped
-    confidence interval as (lower, mean, upper).
+    confidence interval as (lower, point, upper).
     """
 
     tn: ConfidenceInterval
@@ -95,27 +95,31 @@ class BootstrappedConfusionMatrix:
 
     def to_polars(self) -> pl.DataFrame:
         """Transform the dataclass to a long Polars DataFrame with columns
-        `metric`, `lower`, `mean`, and `upper`.
+        `metric`, `lower`, `point`, and `upper`.
 
         Returns
         -------
         pl.DataFrame
-            A DataFrame with columns `metric`, `lower`, `mean`, and `upper`
+            A DataFrame with columns `metric`, `lower`, `point`, and `upper`
+
+        Changelog
+        ---------
+        Return point estimate instead of mean starting version 0.3.0
         """
         dct = self.__dict__
         lower = []
-        mean = []
+        point = []
         upper = []
-        for l, m, u in dct.values():  # noqa: E741
+        for l, p, u in dct.values():  # noqa: E741
             lower.append(l)
-            mean.append(m)
+            point.append(p)
             upper.append(u)
 
         return pl.DataFrame(
             {
                 "metric": dct.keys(),
                 "lower": lower,
-                "mean": mean,
+                "point": point,
                 "upper": upper,
             }
         )
@@ -156,13 +160,12 @@ def _standard_interval_polars(lf: LazyGroupBy, alpha: float) -> pl.LazyFrame:
 def _percentile_interval_polars(lf: LazyGroupBy, alpha: float) -> pl.LazyFrame:
     return lf.agg(
         pl.col("value").quantile(alpha).alias("lower"),
-        pl.col("value").mean().alias("mean"),
         pl.col("value").quantile(1 - alpha).alias("upper"),
     )
 
 
 def _basic_interval_polars(lf: pl.LazyFrame) -> pl.LazyFrame:
-    return lf.with_columns(pl.col("original").mul(2).alias("x")).with_columns(
+    return lf.with_columns(pl.col("point").mul(2).alias("x")).with_columns(
         pl.col("x").sub(pl.col("upper")).alias("lower"),
         pl.col("x").sub(pl.col("lower")).alias("upper"),
     )
@@ -175,7 +178,6 @@ def _bca_interval_polars(
     alpha: float,
     by,
 ) -> pl.LazyFrame:
-
     z1 = norm.ppf(alpha)
     z2 = -z1
 
@@ -252,7 +254,6 @@ def _bca_interval_polars(
         .group_by(by)
         .agg(
             pl.col("value").quantile(pl.col("lower_p").first()).alias("lower"),
-            pl.col("value").mean().alias("mean"),
             pl.col("value").quantile(pl.col("upper_p").first()).alias("upper"),
         )
     )
@@ -284,8 +285,8 @@ def _poisson_bs_func(i, df, df_height, stat_func):
 class Bootstrap:
     r"""Computes a two-sided bootstrap confidence interval of a statistic. Note that
     \( \alpha \) is then defined as \( \frac{1 - \text{confidence}}{2} \). Regardless
-    of method, the result will be a three-tuple of (lower, mean, upper). The process is
-    as follows:
+    of method, the result will be a three-tuple of (lower, point, upper), where point is
+    the point estimate. The process is as follows:
 
     - Resample 100% of the data with replacement for `iterations`
     - Compute the statistic on each resample
@@ -426,10 +427,10 @@ class Bootstrap:
     Examples
     --------
     ``` py
-    import rapidstats
-    ci = rapidstats.Bootstrap(seed=208).mean([1, 2, 3])
+    import rapidstats as rs
+    ci = rs.Bootstrap(seed=208).mean([1, 1, 2, 3])
     ```
-    (1.0, 1.9783333333333328, 3.0)
+    (1.0, 1.75, 2.5)
     """
 
     def __init__(
@@ -488,7 +489,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, higher)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------
@@ -514,18 +515,18 @@ class Bootstrap:
             x for x in _run_concurrent(func, iterable, **kwargs) if not math.isnan(x)
         ]
 
+        original_stat = stat_func(df)
+
         if len(bootstrap_stats) == 0:
             return (math.nan, math.nan, math.nan)
 
         if self.method == "standard":
-            return _standard_interval(bootstrap_stats, self.alpha)
+            return _standard_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "percentile":
-            return _percentile_interval(bootstrap_stats, self.alpha)
+            return _percentile_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "basic":
-            original_stat = stat_func(df)
             return _basic_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "BCa":
-            original_stat = stat_func(df)
             jacknife_stats = [x for x in _jacknife(df, stat_func) if not math.isnan(x)]
 
             return _bca_interval(
@@ -563,7 +564,7 @@ class Bootstrap:
         Returns
         -------
         BootstrappedConfusionMatrix
-            A dataclass of confusion matrix metrics as (lower, mean, upper). See
+            A dataclass of confusion matrix metrics as (lower, point, upper). See
             [rapidstats._bootstrap.BootstrappedConfusionMatrix][] for more details.
 
         Added in version 0.1.0
@@ -629,7 +630,7 @@ class Bootstrap:
             .rename({"y_score": "threshold"})
             .sort("threshold", descending=True)
         )
-        final_cols = ["threshold", "metric", "lower", "mean", "upper"]
+        final_cols = ["threshold", "metric", "lower", "point", "upper"]
 
         strategy = _set_loop_strategy(thresholds, strategy)
 
@@ -649,7 +650,7 @@ class Bootstrap:
                 cms.append(cm)
 
             return pl.concat(cms, how="vertical").with_columns(
-                pl.col("lower", "mean", "upper").fill_nan(None)
+                pl.col("lower", "point", "upper").fill_nan(None)
             )
         elif strategy == "cum_sum":
             if thresholds is None:
@@ -698,27 +699,39 @@ class Bootstrap:
 
             lf = bootstrap_lf.group_by("threshold", "metric")
 
+            original = (
+                _cm_inner(df)
+                .select("threshold", *metrics)
+                .pipe(_map_to_thresholds, thresholds)
+                .unpivot(index="threshold")
+                .rename({"variable": "metric", "value": "point"})
+            )
+
             if self.method == "standard":
                 return (
                     _standard_interval_polars(lf, self.alpha)
+                    .join(
+                        original,
+                        on=["threshold", "metric"],
+                        how="left",
+                        validate="1:1",
+                    )
                     .select(final_cols)
                     .collect()
                 )
             elif self.method == "percentile":
                 return (
                     _percentile_interval_polars(lf, self.alpha)
+                    .join(
+                        original,
+                        on=["threshold", "metric"],
+                        how="left",
+                        validate="1:1",
+                    )
                     .select(final_cols)
                     .collect()
                 )
             elif self.method == "basic":
-                original = (
-                    _cm_inner(df)
-                    .select("threshold", *metrics)
-                    .pipe(_map_to_thresholds, thresholds)
-                    .unpivot(index="threshold")
-                    .rename({"variable": "metric", "value": "original"})
-                )
-
                 return (
                     _percentile_interval_polars(lf, self.alpha)
                     .join(
@@ -783,10 +796,12 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
-        Added in version 0.1.0
-        ----------------------
+        Changelog
+        ---------
+        - Added in version 0.1.0
+        - Returns point estimate instead of mean starting version 0.3.0
         """
         df = _y_true_y_score_to_df(y_true, y_score, sample_weight).with_columns(
             pl.col("y_true").cast(pl.Float64)
@@ -824,10 +839,12 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
-        Added in version 0.1.0
+        Changelog
         ----------------------
+        - Added in version 0.1.0
+        - Returns point estimate instead of mean starting version 0.3.0
         """
         df = (
             _y_true_y_score_to_df(y_true, y_score, sample_weight)
@@ -874,16 +891,15 @@ class Bootstrap:
             .to_list()
         )
 
-        if self.method == "standard":
-            return _standard_interval(bootstrap_stats, self.alpha)
-        elif self.method == "percentile":
-            return _percentile_interval(bootstrap_stats, self.alpha)
-        elif self.method == "basic":
-            original_stat = _ap(y_true, y_score)
+        original_stat = _ap(y_true, y_score)
 
+        if self.method == "standard":
+            return _standard_interval(original_stat, bootstrap_stats, self.alpha)
+        elif self.method == "percentile":
+            return _percentile_interval(original_stat, bootstrap_stats, self.alpha)
+        elif self.method == "basic":
             return _basic_interval(original_stat, bootstrap_stats, self.alpha)
         elif self.method == "BCa":
-            original_stat = _ap(y_true, y_score)
 
             def _cm_jacknife(i):
                 j_df = df.filter(pl.col("index").ne(i))
@@ -922,10 +938,12 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
-        Added in version 0.1.0
+        Changelog
         ----------------------
+        - Added in version 0.1.0
+        - Returns point estimate instead of mean starting version 0.3.0
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
@@ -944,7 +962,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
         """
         df = _y_true_y_score_to_df(y_true, y_score)
 
@@ -961,7 +979,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------
@@ -996,7 +1014,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------
@@ -1075,14 +1093,14 @@ class Bootstrap:
         if strategy == "loop":
             airs: list[dict[str, float]] = []
             for t in tqdm(set(thresholds or y_score)):
-                lower, mean, upper = self.adverse_impact_ratio(
+                lower, point, upper = self.adverse_impact_ratio(
                     df["y_score"].lt(t),
                     df["protected"],
                     df["control"],
                     sample_weight=sample_weight,
                 )
                 airs.append(
-                    {"threshold": t, "lower": lower, "mean": mean, "upper": upper}
+                    {"threshold": t, "lower": lower, "point": point, "upper": upper}
                 )
 
             return pl.DataFrame(airs).fill_nan(None).pipe(_fill_infinite, None)
@@ -1122,27 +1140,29 @@ class Bootstrap:
 
             lf = bootstrap_lf.group_by("threshold")
 
-            final_cols = ["threshold", "lower", "mean", "upper"]
+            final_cols = ["threshold", "lower", "point", "upper"]
+
+            original = (
+                _air_at_thresholds_core(df, thresholds, has_sample_weight)
+                .rename({"air": "point"})
+                .unique("threshold")
+            )
 
             if self.method == "standard":
                 return (
                     _standard_interval_polars(lf, self.alpha)
+                    .join(original, on="threshold", how="left", validate="1:1")
                     .select(final_cols)
                     .collect()
                 )
             elif self.method == "percentile":
                 return (
                     _percentile_interval_polars(lf, self.alpha)
+                    .join(original, on="threshold", how="left", validate="1:1")
                     .select(final_cols)
                     .collect()
                 )
             elif self.method == "basic":
-                original = (
-                    _air_at_thresholds_core(df, thresholds, has_sample_weight)
-                    .rename({"air": "original"})
-                    .unique("threshold")
-                )
-
                 return (
                     _percentile_interval_polars(lf, self.alpha)
                     .join(original, on="threshold", how="left", validate="1:1")
@@ -1198,7 +1218,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------
@@ -1222,7 +1242,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------
@@ -1244,7 +1264,7 @@ class Bootstrap:
         Returns
         -------
         ConfidenceInterval
-            A tuple of (lower, mean, upper)
+            A tuple of (lower, point, upper)
 
         Added in version 0.1.0
         ----------------------

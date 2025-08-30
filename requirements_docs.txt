@@ -1,7 +1,0 @@
-mike==2.1.2
-mkdocs==1.5.3
-mkdocs-material==9.5.3
-mkdocs-section-index==0.3.8
-mkdocstrings[python]==0.24.0
-pymdown-extensions==10.7.1
-pytkdocs[numpy-style]==0.16.1

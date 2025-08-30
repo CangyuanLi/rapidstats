@@ -12,6 +12,7 @@ CONFIDENCE_LEVEL = 0.95
 ALPHA = (1 - CONFIDENCE_LEVEL) / 2
 BOOTSTRAP_STATS = np.random.uniform(size=N)
 THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+POINT = 0.5
 
 
 def _alpha(confidence_level: float) -> float:
@@ -31,7 +32,7 @@ def reference_standard_interval(bootstrap_stats, confidence_level):
 
 
 def test_standard_interval():
-    rs = rapidstats._bootstrap._standard_interval(BOOTSTRAP_STATS, ALPHA)
+    rs = rapidstats._bootstrap._standard_interval(POINT, BOOTSTRAP_STATS, ALPHA)
     ref = reference_standard_interval(BOOTSTRAP_STATS, CONFIDENCE_LEVEL)
 
     assert pytest.approx((rs[0], rs[2])) == ref
@@ -57,7 +58,7 @@ def test_percentile_interval():
     alpha = (1 - confidence_level) / 2
     bootstrap_stats = np.random.uniform(size=n)
 
-    rs = rapidstats._bootstrap._percentile_interval(bootstrap_stats, alpha)
+    rs = rapidstats._bootstrap._percentile_interval(POINT, bootstrap_stats, alpha)
     rs = (rs[0], rs[2])
     ref = reference_percentile_interval(bootstrap_stats, confidence_level)
 
