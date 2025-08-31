@@ -11,7 +11,7 @@ BASE_PATH = Path(__file__).resolve().parents[0]
 
 SEED = 208
 DF = pl.read_parquet(BASE_PATH / "benchmark_data.parquet")
-SIZES = [100, 1_000, 10_000, 100_000, 500_000]
+SIZES = [1_000, 10_000, 100_000, 500_000]
 
 
 def sample_df(n):
@@ -80,7 +80,7 @@ def sample_df_thresh(n, n_thresholds, **kwargs):
 @pybench.config(repeat=1)
 @pybench.parametrize(
     {
-        "n": [1_000, 10_000, 50_000],
+        "n": [1_000, 50_000],
         "n_thresholds": [5, 10, 100, 500],
         "strategy": ["loop", "cum_sum"],
     },
@@ -99,7 +99,7 @@ def bench_confusion_matrix_at_thresholds(df, thresholds, strategy):
 @pybench.config(repeat=1)
 @pybench.parametrize(
     {
-        "n": [1_000, 10_000, 50_000],
+        "n": [1_000, 50_000],
         "n_thresholds": [5, 10, 100, 500],
     },
     setup=sample_df_thresh,
