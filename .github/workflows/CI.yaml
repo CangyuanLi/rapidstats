@@ -45,7 +45,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
+          manylinux: ${{ matrix.platform.target == 'aarch64' && '2_24' || 'auto' }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
