@@ -2,16 +2,17 @@ import subprocess
 import time
 
 import toml
+import tomli
 
 
 def main():
-    with open("pyproject.toml", "r") as f:
-        pyproject_toml = toml.load(f)
+    with open("pyproject.toml", "rb") as f:
+        pyproject_toml = tomli.load(f)
 
     version = pyproject_toml["project"]["version"]
 
-    with open("Cargo.toml", "r") as f:
-        cargo_toml = toml.load(f)
+    with open("Cargo.toml", "rb") as f:
+        cargo_toml = tomli.load(f)
 
     cargo_toml["package"]["version"] = version
 

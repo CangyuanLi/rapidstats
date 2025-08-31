@@ -1016,8 +1016,9 @@ class Bootstrap:
         ConfidenceInterval
             A tuple of (lower, point, upper)
 
-        Added in version 0.1.0
+        Changelog
         ----------------------
+        - Added in version 0.1.0
         """
         df = (
             pl.DataFrame(
