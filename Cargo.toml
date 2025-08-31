@@ -1,11 +1,11 @@
 [package]
 name = "rapidstats"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [lib]
 name = "rapidstats"
-crate-type = ["cdylib"]
+crate-type = [ "cdylib",]
 
 [dependencies]
 ndarray = "0.15.6"
@@ -18,20 +18,12 @@ rand_distr = "0.4"
 
 [dependencies.hashbrown]
 version = "0.15"
-features = ["nightly"]
+features = [ "nightly",]
 
 [dependencies.pyo3-polars]
 version = "0.22"
-features = ["derive"]
+features = [ "derive",]
 
 [dependencies.polars]
 version = "0.49"
-features = [
-    "performant",
-    "random",
-    "lazy",
-    "cum_agg",
-    "unique_counts",
-    "nightly",
-    "repeat_by",
-]
+features = [ "performant", "random", "lazy", "cum_agg", "unique_counts", "nightly", "repeat_by",]
