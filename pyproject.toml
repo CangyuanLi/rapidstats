@@ -12,9 +12,7 @@ classifiers = [
 ]
 dependencies = [
     # 1.26.0 https://github.com/pola-rs/polars/issues/21913
-    # 1.32.2 https://github.com/pola-rs/polars/issues/23965
-    # 1.32.3 can't find issue but something broke plugins
-    "polars>=1.0.0,!=1.26.0,!=1.32.2,!=1.32.3",
+    "polars>=1.0.0,!=1.26.0",
     "narwhals>=1.0.0",
     "tqdm",
 ]
