@@ -103,13 +103,23 @@ fn sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
 fn poisson_sample(df: DataFrame, df_height: usize, seed: Option<u64>) -> DataFrame {
     let repeats = Series::new("repeats".into(), poisson(1.0, df_height, seed));
 
+    let index_col = Selector::ByName {
+        names: Arc::from(vec![PlSmallStr::from("index")].into_boxed_slice()),
+        strict: true,
+    };
+
     df.lazy()
         .with_row_index("index", Some(0))
         .with_column(repeats.lit())
         .with_column(col("index").repeat_by(col("repeats")))
-        .explode(["index"])
-        .drop_nulls(Some(vec![col("index")]))
-        .drop(["index", "repeats"])
+        .explode(index_col.clone())
+        .drop_nulls(Some(index_col))
+        .drop(Selector::ByName {
+            names: Arc::from(
+                vec![PlSmallStr::from("index"), PlSmallStr::from("repeats")].into_boxed_slice(),
+            ),
+            strict: true,
+        })
         .collect()
         .unwrap()
 }
