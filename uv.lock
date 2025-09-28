@@ -2824,7 +2824,7 @@ typing = [
 [package.metadata]
 requires-dist = [
     { name = "narwhals", specifier = ">=1.0.0" },
-    { name = "polars", specifier = ">=1.0.0,!=1.26.0,!=1.32.2,!=1.32.3" },
+    { name = "polars", specifier = ">=1.0.0,!=1.26.0" },
     { name = "pyarrow", marker = "extra == 'pyarrow'", specifier = ">=7.0.0" },
     { name = "tqdm" },
 ]

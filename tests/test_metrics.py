@@ -161,12 +161,13 @@ def test_bootstrap_f1(y_true, y_pred):
     # resampling for getting the bootstrap runs. For some measure of confidence, lets
     # run both bootstraps 20 times and take the mean of the results, and see if this
     # mean is roughly similar.
+    iterations = 200
     rs_res = []
     ref_res = []
     for i in range(20):
         res = (
             rs.Bootstrap(
-                iterations=BOOTSTRAP_ITERATIONS,
+                iterations=iterations,
                 method="percentile",
                 sampling_method="multinomial",
                 seed=SEED + i,
@@ -179,7 +180,7 @@ def test_bootstrap_f1(y_true, y_pred):
         ref = scipy.stats.bootstrap(
             (y_true, y_pred),
             reference_f1,
-            n_resamples=BOOTSTRAP_ITERATIONS,
+            n_resamples=iterations,
             method="percentile",
             random_state=SEED + i,
         ).confidence_interval
