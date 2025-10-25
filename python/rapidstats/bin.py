@@ -25,6 +25,10 @@ def freedman_diaconis(x: ArrayLike) -> int:
         k = \lceil \frac{\max{x} - \min{x}}{h} \rceil
     \]
 
+    If $h$ is 0, compute the generalized IQR using successively larger intervals (e.g.
+    .01 and .99 instead of .25 and .75) to determine $h$. As a last ditch effort, use
+    3.5 times the standard deviation as $h$.
+
     Parameters
     ----------
     x : ArrayLike
@@ -39,8 +43,27 @@ def freedman_diaconis(x: ArrayLike) -> int:
     iqr = x.quantile(0.75, interpolation="linear") - x.quantile(
         0.25, interpolation="linear"
     )
+    h = 2 * iqr
 
-    bin_width = 2.0 * iqr * x.len() ** (-1.0 / 3.0)
+    # It's possible that the IQR is 0. In that case, we try and compute the generalized
+    # IQR using successively wider quantiles. Taken from R's hist.default function and
+    # this answer: https://stats.stackexchange.com/questions/455237/what-to-do-when-iqr-returns-0-in-freedman-diaconis-rule
+    alpha = 1 / 4
+    alpha_min = 1 / 512
+
+    while h == 0 and alpha >= alpha_min:
+        alpha /= 2
+
+        h = (
+            x.quantile(alpha, interpolation="linear")
+            - x.quantile(1 - alpha, interpolation="linear")
+        ) / (1 - 2 * alpha)
+
+    # As a last ditch, use 3.5 times the standard deviation
+    if h == 0:
+        h = 3.5 * x.std()
+
+    bin_width = h * x.len() ** (-1.0 / 3.0)
 
     return _bin_width_to_count(x, bin_width)
 
