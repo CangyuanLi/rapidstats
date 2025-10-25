@@ -25,6 +25,10 @@ def freedman_diaconis(x: ArrayLike) -> int:
         k = \lceil \frac{\max{x} - \min{x}}{h} \rceil
     \]
 
+    If $h$ is 0, compute the generalized IQR using successively larger intervals (e.g.
+    .01 and .99 instead of .25 and .75) to determine $h$. As a last ditch effort, use
+    3.5 times the standard deviation as $h$.
+
     Parameters
     ----------
     x : ArrayLike
