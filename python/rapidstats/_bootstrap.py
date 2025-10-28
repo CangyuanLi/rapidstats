@@ -293,7 +293,7 @@ class Bootstrap:
 
     If the method is `standard`,
 
-    - Compute the mean \( \hat{\theta} \) of the bootstrap statistics
+    - Compute the statistic on the original data \( \hat{\theta} \)
     - Compute the standard error of the bootstrap statistics. Note that the standard
     error of any statistic is defined as the standard deviation of its sampling
     distribution.
