@@ -12,6 +12,7 @@ mod distributions;
 mod general;
 mod metrics;
 mod string;
+mod viz;
 
 use pyo3_polars::PolarsAllocator;
 #[global_allocator]
@@ -194,6 +195,28 @@ fn _rectangular_auc(df: PyDataFrame) -> PyResult<f64> {
     ))
 }
 
+#[pyfunction]
+#[pyo3(signature = (df, x, y, min_distance, always_keep, order))]
+fn _thin_points_greedy(
+    df: PyDataFrame,
+    x: &str,
+    y: &str,
+    min_distance: f64,
+    always_keep: &str,
+    order: Option<&str>,
+) -> PyResult<Vec<bool>> {
+    let df: DataFrame = df.into();
+
+    Ok(viz::thin_points_greedy(
+        df,
+        x,
+        y,
+        min_distance,
+        always_keep,
+        order,
+    ))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -226,6 +249,7 @@ fn _rustystats(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_poisson, m)?)?;
     m.add_function(wrap_pyfunction!(_rectangular_auc, m)?)?;
     m.add_function(wrap_pyfunction!(_trapezoidal_auc, m)?)?;
+    m.add_function(wrap_pyfunction!(_thin_points_greedy, m)?)?;
 
     Ok(())
 }
