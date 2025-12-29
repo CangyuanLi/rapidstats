@@ -70,11 +70,38 @@ class ScreenTransform:
         if ymax < ymin:
             raise ValueError("ymax must be >= ymin")
 
-        sx = self.width / (xmax - xmin)
-        sy = self.height / (ymax - ymin)
+        # We want an affine map u(x) = ax + b. The map we choose is given by solving the
+        # systems of equations with two constraints:
+        # 1. The smallest data value maps to the left edge
+        #   u(xmin) = 0, u(ymin) = 0
+        # 2. The largest data value maps to the right edge
+        #   u(xmax) = width, u(ymax) = height
+        # Solving these gives:
+        #   a = width / (xmax - xmin)
+        #   b = -a * xmin
+        # If xmax = xmin, we set a = 0 and b to any constant. Let's set it to either
+        # width / 2 or height / 2 (middle of the screen).
+
+        xrange = xmax - xmin
+        yrange = ymax - ymin
+
+        if xrange == 0:
+            ax = 0.0
+            bx = self.width / 2
+        else:
+            ax = self.width / xrange
+            bx = -ax * xmin
+
+        if yrange == 0:
+            ay = 0.0
+            by = self.height / 2
+        else:
+            ay = self.height / yrange
+            by = -ay * ymin
 
         return nw_df.with_columns(
-            nw.col(x).__sub__(xmin).__mul__(sx), nw.col(y).__sub__(ymin).__mul__(sy)
+            nw.col(x).__mul__(ax).__add__(bx),
+            nw.col(y).__mul__(ay).__add__(by),
         ).to_native()
 
 
@@ -120,8 +147,8 @@ def thin_points(
     nwt.IntoDataFrameT
         The original DataFrame filtered to the thinned points
     """
-    if transform is not None:
-        sanitized = transform(df, x, y)
+    if min_distance < 0:
+        raise ValueError("`min_distance` must be >= 0")
 
     to_select = [
         c
@@ -134,10 +161,17 @@ def thin_points(
         if c is not None
     ]
 
-    sanitized = nw.from_native(sanitized).select(to_select)
+    selected = nw.from_native(native_object=df).select(to_select).to_native()
 
-    sanitized = sanitized.to_polars().with_columns(
-        pl.col(x, y).cast(pl.Float64),
+    if transform is not None:
+        selected = transform(selected, x, y)
+
+    sanitized = (
+        nw.from_native(selected)
+        .to_polars()
+        .with_columns(
+            pl.col(x, y).cast(pl.Float64),
+        )
     )
 
     if always_keep is None:
