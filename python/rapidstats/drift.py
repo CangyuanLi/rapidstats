@@ -48,8 +48,15 @@ def _psi(
     current_len: int,
     epsilon: float | None,
 ) -> float:
-    def _fill_zero(e: pl.Expr, value: float) -> pl.Expr:
+    def _fill_zero(e: pl.Expr, value: float | None) -> pl.Expr:
         return pl.when(e.eq(0)).then(value).otherwise(e)
+
+    major, minor, _ = pl.__version__.split(".")
+
+    if int(major) <= 1 and int(minor) < 24:
+        nulls_equal_kwargs = {"join_nulls": True}
+    else:
+        nulls_equal_kwargs = {"nulls_equal": True}
 
     res = (
         reference_hist.lazy()
@@ -60,7 +67,7 @@ def _psi(
             how="full",
             validate="1:1",
             coalesce=True,
-            nulls_equal=True,
+            **nulls_equal_kwargs,
         )
         .with_columns(
             pl.col("reference_count", "current_count").fill_null(0),
