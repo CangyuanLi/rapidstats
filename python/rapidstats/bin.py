@@ -194,6 +194,20 @@ def sqrt(x: ArrayLike) -> int:
 
 
 def auto(x: ArrayLike) -> int:
+    """Determines the bin count by first using the Freedman Diaconis rule. Since the
+    rule may return a pathologically large number of bins, if Freedman Diaconis returns
+    a number of bins greater than the square root of the number of observations, use
+    Doane's rule.
+
+    Parameters
+    ----------
+    x : ArrayLike
+
+    Returns
+    -------
+    int
+        Bin count
+    """
     fd = freedman_diaconis(x)
 
     if fd >= sqrt(x):
