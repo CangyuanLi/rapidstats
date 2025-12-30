@@ -6,14 +6,16 @@ from typing import Literal
 import polars as pl
 from polars.series.series import ArrayLike
 
-from .bin import doane, freedman_diaconis, rice, scott, sqrt, sturges
+from .bin import auto, doane, freedman_diaconis, rice, scott, sqrt, sturges
 
-BinMethod = Literal["doane", "fd", "rice", "sturges", "scott", "sqrt"]
+BinMethod = Literal["auto", "doane", "fd", "rice", "sturges", "scott", "sqrt"]
 
 
 def _bin_count(x: pl.Series, bin_count: int | BinMethod) -> int:
     if isinstance(bin_count, int):
         return bin_count
+    elif bin_count == "auto":
+        return auto(x)
     elif bin_count == "doane":
         return doane(x)
     elif bin_count == "fd":
@@ -178,7 +180,7 @@ def psi(
     current: ArrayLike,
     *,
     bins: list[float] | None = None,
-    bin_count: int | BinMethod = "fd",
+    bin_count: int | BinMethod = "auto",
     include_nulls: bool = True,
     epsilon: float | None = 1e-4,
 ) -> float:
@@ -208,6 +210,7 @@ def psi(
         If an integer, the number of bins. It can also be a string corresponding to an
         auto-binning method, by default "fd". The possible methods are
 
+        - "auto", see [rapidstats.bin.auto][]
         - "doane", see [rapidstats.bin.doane][]
         - "fd", see [rapidstats.bin.freedman_diaconis][]
         - "rice", see [rapidstats.bin.rice][]
