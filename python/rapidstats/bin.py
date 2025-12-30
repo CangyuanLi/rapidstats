@@ -191,3 +191,12 @@ def sqrt(x: ArrayLike) -> int:
         Bin count
     """
     return math.ceil(math.sqrt(len(x)))
+
+
+def auto(x: ArrayLike) -> int:
+    fd = freedman_diaconis(x)
+
+    if fd >= sqrt(x):
+        return doane(x)
+    else:
+        return fd
