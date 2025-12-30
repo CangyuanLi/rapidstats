@@ -14,6 +14,7 @@ nav:
 - Metrics: metrics.md
 - Polars: polars.md
 - Preprocessing: preprocessing.md
+- Visualization: viz.md
 - Miscellaneous: misc.md
 
 theme:
