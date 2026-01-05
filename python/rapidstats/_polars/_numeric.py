@@ -169,3 +169,57 @@ def sum_horizontal(
         raise ValueError(
             f"Invalid `null_strategy` {null_method}, must be one of `kleene`, `ignore`, or `propagate`"
         )
+
+
+def is_pareto(*exprs: IntoExpr | Iterable[IntoExpr]) -> pl.Expr:
+    """Identifies whether each point lies on the Pareto frontier. A point is considered
+    Pareto-optimal (non-dominated) if there is no other point that is at least as large
+    in all dimensions and strictly larger in at least one dimension. All dimensions are
+    assumed to be maximized.
+
+    !!! warning
+
+        Currently, only 2 dimensions are supported.
+
+    Returns
+    -------
+    pl.Expr
+        A boolean expression indicating whether each row is pareto. Rows where there are
+        any nulls or NaNs are null.
+
+    Examples
+    --------
+    ``` py
+    import polars as pl
+    import rapidstats.polars as prs
+
+    df = pl.DataFrame({"x": [5, 1, 3, 2], "y": [1, 5, 3, 2]})
+    df.select(prs.is_pareto("x", "y"))
+    ```
+    ``` title="output"
+    shape: (4, 1)
+    ┌───────┐
+    │ x     │
+    │ ---   │
+    │ bool  │
+    ╞═══════╡
+    │ true  │
+    │ true  │
+    │ true  │
+    │ false │
+    └───────┘
+    ```
+
+    Added in version 0.4.0
+    ----------------------
+    """
+    parsed_exprs = _parse_into_list_of_exprs(*exprs)
+
+    if len(parsed_exprs) != 2:
+        raise NotImplementedError("Only 2 dimensions are currently supported")
+
+    return pl.plugins.register_plugin_function(
+        plugin_path=_PLUGIN_PATH,
+        function_name="pl_pareto_2d",
+        args=[e.cast(pl.Float64) for e in parsed_exprs],
+    )

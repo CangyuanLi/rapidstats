@@ -146,3 +146,17 @@ def test_sum_horizontal():
         ).to_series(),
         pl.Series("x", [3, None, 1]),
     )
+
+
+def test_is_pareto():
+    df = pl.DataFrame({"x": [5, 1, 3, 2], "y": [1, 5, 3, 2]}).with_columns(
+        prs.is_pareto("x", "y").alias("is_pareto")
+    )
+    assert df["is_pareto"].to_list() == [True, True, True, False]
+
+
+def test_is_pareto_with_nulls():
+    df = pl.DataFrame({"x": [5, 1, 3, 2], "y": [1, 5, None, 2]}).with_columns(
+        prs.is_pareto("x", "y").alias("is_pareto")
+    )
+    assert df["is_pareto"].to_list() == [True, True, None, True]
