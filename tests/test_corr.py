@@ -50,6 +50,20 @@ def test_correlation_matrix():
     assert np.allclose(ref, rs, equal_nan=True)
 
 
+def test_correlation_matrix_batched():
+    ref = reference_correlation_matrix(DF.to_pandas())
+    rs = (
+        rapidstats.correlation_matrix(
+            DF.fill_nan(None),
+            batch_options=rapidstats.CorrelationBatchOptions(delete_ok=True),
+        )
+        .drop("")
+        .to_numpy()
+    )
+
+    assert np.allclose(ref, rs, equal_nan=True)
+
+
 def test_correlation_matrix_combinations():
     # Test if user passes in combinations directly
 
