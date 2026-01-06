@@ -1,4 +1,5 @@
 import inspect
+import tempfile
 
 import catboost
 import lightgbm
@@ -120,6 +121,18 @@ def test_rfe_early_stopping(estimator):
     ).fit(X, y, **fit_kwargs)
 
 
+def test_rfe_save_load():
+    with tempfile.NamedTemporaryFile() as f:
+        x = rs.selection.RFE(estimator=ESTIMATORS[0]).fit(X, y)
+        x.save(f.name)
+
+        ref = x.selected_features_
+
+        res = rs.selection.RFE.load(f.name).selected_features_
+
+        assert ref == res
+
+
 @pytest.mark.parametrize("estimator", ESTIMATORS)
 def test_nfe(estimator):
     fit_kwargs = {}
@@ -130,6 +143,18 @@ def test_nfe(estimator):
 
     assert "f0.99" in nfe.selected_features_
     assert "f0.99" in nfe.transform(X).columns
+
+
+def test_nfe_save_load():
+    with tempfile.NamedTemporaryFile() as f:
+        x = rs.selection.NFE(estimator=ESTIMATORS[0]).fit(X, y)
+        x.save(f.name)
+
+        ref = x.selected_features_
+
+        res = rs.selection.NFE.load(f.name).selected_features_
+
+        assert ref == res
 
 
 def test_cfe():
@@ -203,3 +228,15 @@ def test_cfe_repro():
         rs.selection.CFE().fit(df).selected_features_
         == rs.selection.CFE().fit(df).selected_features_
     )
+
+
+def test_cfe_save_load():
+    with tempfile.NamedTemporaryFile() as f:
+        x = rs.selection.CFE().fit(X)
+        x.save(f.name)
+
+        ref = x.selected_features_
+
+        res = rs.selection.CFE.load(f.name).selected_features_
+
+        assert ref == res
