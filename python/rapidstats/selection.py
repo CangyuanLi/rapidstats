@@ -4,6 +4,7 @@ import copy
 import inspect
 import logging
 import math
+import json
 import pickle
 from collections.abc import Iterable
 from pathlib import Path
@@ -25,6 +26,16 @@ class Estimator(Protocol):
     """A class that implements a `.fit(X, y, **kwargs)` method."""
 
     def fit(self, X, y, **kwargs): ...
+
+
+def _write_list(lst, path: str | Path):
+    with open(path, "w") as f:
+        json.dump(lst, f)
+
+
+def _read_list(path: str | Path):
+    with open(path, "r") as f:
+        return json.load(f)
 
 
 def _copy(estimator: Estimator):
@@ -234,7 +245,7 @@ class RFE:
 
     Attributes
     ----------
-    estimator : Estimator,
+    unfit_estimator : Estimator,
     n_features_to_select : float
     step : float
     importance : Callable[[RFEState], ArrayLike]
@@ -363,7 +374,7 @@ class RFE:
                 iteration += 1
                 pbar.update(1)
 
-        self.estimator_ = est
+        self._estimator_ = est
         self.selected_features_ = sorted(features)
 
         return self
@@ -396,6 +407,38 @@ class RFE:
         nwt.IntoDataFrameT
         """
         return self.fit(X, y, **fit_kwargs).transform(X)
+
+    def save(self, path: str | Path):
+        """Saves the fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to save to
+
+        Returns
+        -------
+        Self
+        """
+        _write_list(self.selected_features_, path)
+
+        return self
+
+    def load(self, path: str | Path):
+        """Loads in an already fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to load from
+
+        Returns
+        -------
+        Self
+        """
+        self.selected_features_ = _read_list(path)
+
+        return self
 
 
 class NFEState(TypedDict):
@@ -551,6 +594,38 @@ class NFE:
         nwt.IntoDataFrameT
         """
         return self.fit(X, y, **fit_kwargs).transform(X)
+
+    def save(self, path: str | Path):
+        """Saves the fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to save to
+
+        Returns
+        -------
+        Self
+        """
+        _write_list(self.selected_features_, path)
+
+        return self
+
+    def load(self, path: str | Path):
+        """Loads in an already fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to load from
+
+        Returns
+        -------
+        Self
+        """
+        self.selected_features_ = _read_list(path)
+
+        return self
 
 
 class CFE:
@@ -726,3 +801,35 @@ class CFE:
         nwt.IntoFrameT
         """
         return self.fit(X).transform(X)
+
+    def save(self, path: str | Path):
+        """Saves the fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to save to
+
+        Returns
+        -------
+        Self
+        """
+        _write_list(self.selected_features_, path)
+
+        return self
+
+    def load(self, path: str | Path):
+        """Loads in an already fit selector.
+
+        Parameters
+        ----------
+        path : str | Path
+            The file to load from
+
+        Returns
+        -------
+        Self
+        """
+        self.selected_features_ = _read_list(path)
+
+        return self
