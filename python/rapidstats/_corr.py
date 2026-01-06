@@ -117,6 +117,7 @@ def _correlation_matrix(
         )
         .drop("variable")
         .rename({"value": "correlation"})
+        .select("c1", "c2", "correlation")
         .collect()
     )
 
