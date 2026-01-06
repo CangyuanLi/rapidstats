@@ -17,6 +17,28 @@ CorrelationMatrixFormat = Literal["wide", "long"]
 
 @dataclass
 class CorrelationBatchOptions:
+    """Options to control batching in [rapidstats.correlation_matrix][].
+
+    Parameters
+    ----------
+    batch_size : int | float, optional
+        The number of combinations (where a combination is a pair of features) to
+        compute each batch. If a float between 0 and 1, it is interpreted as a percent,
+        by default = 0.1
+    cache_dir : str | Path | None, optional
+        The directory to save out the results of each batch. If None, creates a folder
+        called "__rapidstats_correlation_cache__" in the current working directory, by
+        default None
+    start_iteration : int | None, optional
+        The iteration to start at. If None, will start at the latest iteration available
+        in `cache_dir`, by default None
+    delete_ok : bool, optional
+        Whether to delete `cache_dir` after the correlation matrix is computed, by
+        default False
+    quiet : bool
+        Whether to print progress information, by default False
+    """
+
     batch_size: int | float = 0.1
     cache_dir: str | Path | None = None
     start_iteration: int | None = None
@@ -241,12 +263,23 @@ def correlation_matrix(
     l2 : list[str], optional
         A list of columns to appear as the rows of the correlation matrix,
         by default None
-    method : CorrelationMethod, optional
+    method : Literal["pearson", "spearman"], optional
         How to calculate the correlation, by default "pearson"
+    format : Literal["wide", "long"], optional
+        The format the correlation matrix is returned in. If "wide", it is the classic
+        correlation matrix. If "long", it is a DataFrame with the columns `c1`, `c2`,
+        and `correlation`, by default "wide"
+
+        !!! Added in version 0.4.0
     index : str, optional
-        The name of the `l2` column in the final output, by default ""
+        The name of the `l2` column in the final output. Ignored if the format is
+        "long", by default ""
 
         !!! Added in version 0.2.0
+        !!! Renamed from "index_name" to "index" in version 0.4.0
+    batch_options : CorrelationBatchOptions | None, optional
+        Parameters that control how to compute the correlation matrix in a batched
+        manner. If None, does not use batching, by default None
 
     Returns
     -------
