@@ -160,3 +160,37 @@ def test_is_pareto_with_nulls():
         prs.is_pareto("x", "y").alias("is_pareto")
     )
     assert df["is_pareto"].to_list() == [True, True, None, True]
+
+
+def test_is_pareto_min_min():
+    df = pl.DataFrame(
+        {
+            "bias": [1.0, 0.5, 0.5],
+            "bad_rate": [0.01, 0.02, 0.03],
+        }
+    ).with_columns(
+        prs.is_pareto(pl.col("bias").mul(-1), pl.col("bad_rate").mul(-1)).alias(
+            "is_pareto"
+        )
+    )
+
+    assert df["is_pareto"].to_list() == [True, True, False]
+
+
+def test_is_pareto_min_max():
+    df = pl.DataFrame({"bias": [0.6, 0.5, 0.5], "auc": [0.7, 0.7, 0.6]}).with_columns(
+        prs.is_pareto(pl.col("bias").mul(-1), "auc").alias("is_pareto")
+    )
+
+    assert df["is_pareto"].to_list() == [False, True, False]
+
+
+def test_is_pareto_max_min():
+    df = pl.DataFrame(
+        {
+            "air": [0.5, 0.5, 0.6],
+            "bad_rate": [0.1, 0.05, 0.3],
+        }
+    ).with_columns(prs.is_pareto(pl.col("bad_rate").mul(-1), "air").alias("is_pareto"))
+
+    assert df["is_pareto"].to_list() == [False, True, True]
