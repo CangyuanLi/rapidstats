@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class Estimator(Protocol):
+    """A class that implements a `.fit(X, y, **kwargs)` method."""
+
     def fit(self, X, y, **kwargs): ...
 
 
@@ -42,7 +44,26 @@ def _roc_auc(est, X, y) -> float:
 
 
 class EarlyStopping:
-    """A callback that activates early stopping."""
+    """A callback that activates early stopping.
+
+    Parameters
+    ----------
+    X : Optional[Any], optional
+        The evaluation dataset the model should predict. If None, it will first
+        look for the existence of an `eval_set` parameter. If `eval_set` is not
+        available, it will use the training data, by default None
+    y : Optional[Any], optional
+        The evaluation ground truth target, by default None
+    metric : Callable[[Estimator, Any, Any], float], optional
+        A callable that takes in the estimator, `X`, `y` and returns a float, by default
+        a function that calls `.predict_proba(X)[:, 0]` on the fit estimator to obtain
+        y_pred and and returns the ROC-AUC
+    max_delta : float, optional
+        The maximum difference between the best iteration and the worst iteration
+        before stopping, by default 0.1
+    direction : Literal["maximize", "minimize"], optional
+        Whether the metric should be maximized or minimized, by default "maximize"
+    """
 
     def __init__(
         self,
@@ -52,25 +73,6 @@ class EarlyStopping:
         max_delta: float = 0.1,
         direction: Literal["maximize", "minimize"] = "maximize",
     ):
-        """_summary_
-
-        Parameters
-        ----------
-        X : Optional[Any], optional
-            The evaluation dataset the model should predict. If None, it will first
-            look for the existence of an `eval_set` parameter. If `eval_set` is not
-            available, it will use the training data, by default None
-        y : Optional[Any], optional
-            The evaluation ground truth target, by default None
-        metric : Callable[[Estimator, Any, Any], float], optional
-            A callable that takes in the estimator, `X`, `y` and returns a float,
-            by default _roc_auc
-        max_delta : float, optional
-            The maximum difference between the best iteration and the worst iteration
-            before stopping, by default 0.1
-        direction : Literal["maximize", "minimize"], optional
-            Whether the metric should be maximized or minimized, by default "maximize"
-        """
         self.X = X
         self.y = y
         self.metric_func = metric
@@ -116,6 +118,16 @@ class EarlyStopping:
 
 
 class ModelCheckpoint:
+    """A callback that saves out the fit estimator every RFE iteration. It first checks
+    if the estimator has a "save_model" method and saves it out as "{iteration}.sav" if
+    so. If not, it saves it out as "{iteration}.pkl".
+
+    Parameters
+    ----------
+    out_dir : str | Path
+        The directory to save the model to
+    """
+
     def __init__(self, out_dir: str | Path):
         self.out_dir = Path(out_dir)
 
@@ -147,7 +159,24 @@ def _get_max_iterations(n_features: int, n_features_to_select: int, step: float)
 
 
 class RFEState(TypedDict):
-    """The state at each RFE iteration"""
+    """The state at each RFE iteration.
+
+    Attributes
+    ----------
+    estimator: Estimator
+        The fit estimator
+    X: Any
+        A DataFrame of features reduced to the features at that iteration
+    y: Any
+        The target
+    eval_set: Optional[list[tuple[Any, Any]]]
+        Data to use for evaluation. If present, will be reduced to the features at that
+        iteration
+    features: list[str]
+        The features at that iteration
+    iteration: int
+        The iteration number, starting from 0
+    """
 
     estimator: Estimator
     X: Any
@@ -177,12 +206,50 @@ def _rfe_get_feature_importance(rfe_state: RFEState) -> ArrayLike:
 
 
 class RFE:
+    """Performs recursive feature elimination. Recursively drop the least important
+    features until only `n_features_to_select` features remain. This is done by
+    training `estimator` on the intial set of features, returning the importances
+    through `importance`, and dropping the bottom `step` features, repeated until
+    the stopping condition is met.
+
+    Parameters
+    ----------
+    estimator : Estimator
+        An unfit estimator used to train the model each iteration
+    n_features_to_select : float, optional
+        The desired final number of features, by default 1
+    step : float, optional
+        The number (if an int) or percent (if a float) of features to eliminate each
+        iteration. If a percent, the denominator is the number of remaining features
+        each iteration, by default 1
+    importance : Callable[[RFEState], ArrayLike], optional
+        A callable that takes RFEState as input and returns an ArrayLike in the
+        same order as the features representing the importance of each feature, by
+        default a function that attempts to read the "feature_importances_"
+        attribute of the fitted estimator
+    callbacks : Optional[Iterable[Callable[[RFEState], Any]]], optional
+        An iterable of callbacks to run each iteration, by default None
+    quiet : bool, optional
+        Whether to display information like progress bars, by default False
+
+    Attributes
+    ----------
+    estimator : Estimator,
+    n_features_to_select : float
+    step : float
+    importance : Callable[[RFEState], ArrayLike]
+    callbacks : Optional[Iterable[Callable[[RFEState], Any]]]
+    quiet : bool
+    selected_features_ : list[str]
+        The selected features sorted alphabetically, available only after fitting
+    """
+
     def __init__(
         self,
         estimator: Estimator,
         n_features_to_select: float = 1,
         step: float = 1,
-        importance: Callable[[RFEState], Iterable[float]] = _rfe_get_feature_importance,
+        importance: Callable[[RFEState], ArrayLike] = _rfe_get_feature_importance,
         callbacks: Optional[Iterable[Callable[[RFEState], Any]]] = None,
         quiet: bool = False,
     ):
@@ -199,6 +266,19 @@ class RFE:
         y: Any,
         **fit_kwargs,
     ):
+        """Fit from a DataFrame of features and a target.
+
+        Parameters
+        ----------
+        X : nwt.IntoDataFrame
+            A DataFrame of features
+        y : Any
+            A target
+
+        Returns
+        -------
+        Self
+        """
         X_nw = nw.from_native(X, eager_only=True)
 
         if "eval_set" in fit_kwargs:
@@ -289,13 +369,48 @@ class RFE:
         return self
 
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : nwt.IntoFrameT
+
+        Returns
+        -------
+        nwt.IntoFrameT
+        """
         return nw.from_native(X).select(self.selected_features_).to_native()
 
-    def fit_transform(self, X, y, **fit_kwargs) -> Any:
+    def fit_transform(
+        self, X: nwt.IntoDataFrameT, y: Any, **fit_kwargs
+    ) -> nwt.IntoDataFrameT:
+        """Equivalent to calling `.fit(X, y, **fit_kwargs).transform(X)`.
+
+        Parameters
+        ----------
+        X : nwt.IntoDataFrameT
+        y : Any
+
+        Returns
+        -------
+        nwt.IntoDataFrameT
+        """
         return self.fit(X, y, **fit_kwargs).transform(X)
 
 
 class NFEState(TypedDict):
+    """A dictionary storing NFE state.
+
+    Attributes
+    ----------
+    estimator: Estimator
+        A fit estimator
+    X: Any
+        A DataFrame of features
+    y: Any
+        A target
+    """
+
     estimator: Estimator
     X: Any
     y: Any
@@ -306,6 +421,31 @@ def _nfe_get_feature_importance(nfe_state: NFEState) -> ArrayLike:
 
 
 class NFE:
+    """Performs noise feature elimination. A model is estimated with the features
+    and a column of random noise added. Only features that have a higher importance
+    than the random noise are selected.
+
+    Parameters
+    ----------
+    estimator : Estimator
+        An unfit estimator used to train the model
+    importance : Callable[[NFEState], ArrayLike], optional
+        A callable that determines how feature importance is computed. It should accept
+        NFEState and return an ArrayLike of importances in the same order as features
+        are encountered in X, by default a function that attempts to read a
+        "feature_importances_" attribute from the fitted estimator
+    seed : Optional[int], optional
+        The seed, by default 208
+
+    Attributes
+    ----------
+    unfit_estimator : Estimator
+    importance : Callable[[NFEState], ArrayLike]
+    seed : Optional[int]
+    selected_features_ : list[str]
+        The selected features sorted alphabetically, available only after fitting
+    """
+
     _NOISE_COL = "__rapidstats_nfe_random_noise__"
 
     def __init__(
@@ -331,6 +471,21 @@ class NFE:
         )
 
     def fit(self, X: nwt.IntoDataFrame, y: Any, **fit_kwargs):
+        """Fit from a DataFrame of features and a target.
+
+        Parameters
+        ----------
+        X : nwt.IntoDataFrame
+            A DataFrame of features
+        y : Any
+            The target
+        fit_kwargs : dict[str, Any]
+            Any kwargs to pass to the estimator's `.fit()` method
+
+        Returns
+        -------
+        Self
+        """
         X_nw = nw.from_native(X, eager_only=True).pipe(self._add_noise)
 
         if "eval_set" in fit_kwargs:
@@ -369,15 +524,58 @@ class NFE:
         return self
 
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : nwt.IntoFrameT
+
+        Returns
+        -------
+        nwt.IntoFrameT
+        """
         return nw.from_native(X).select(self.selected_features_).to_native()
 
     def fit_transform(
         self, X: nwt.IntoDataFrameT, y: Any, **fit_kwargs
     ) -> nwt.IntoDataFrameT:
+        """Equivalent to calling `.fit(X, y, **fit_kwargs).transform(X)`.
+
+        Parameters
+        ----------
+        X : nwt.IntoDataFrameT
+        y : Any
+
+        Returns
+        -------
+        nwt.IntoDataFrameT
+        """
         return self.fit(X, y, **fit_kwargs).transform(X)
 
 
 class CFE:
+    """Performs correlation feature elimination. The algorithm is as follows:
+    Given a correlation matrix, identify all the non-identity pairs that are
+    >= `threshold`. Compute the number of times each feature is highly correlated
+    with another feature. Drop the feature with the highest count. Re-compute these
+    counts and drop until we are left with a set of features that satisfy our
+    threshold condition.
+
+    Parameters
+    ----------
+    threshold : float, optional
+        Drop features that have correlations >= `threshold`, by default 0.99
+    seed : Optional[int], optional
+        The seed, by default 208
+
+    Attributes
+    ----------
+    threshold : float
+    seed : Optional[int]
+    selected_features_ : list[str]
+        The selected features sorted alphabetically, available only after fitting
+    """
+
     def __init__(self, threshold: float = 0.99, seed: Optional[int] = 208):
         self.threshold = threshold
         self.seed = seed
@@ -409,6 +607,24 @@ class CFE:
     def fit_from_correlation_matrix(
         self, corr_mat: nwt.IntoFrame, index: str = "", transform: bool = True
     ):
+        """Fit directly from a correlation matrix.
+
+        Parameters
+        ----------
+        corr_mat : nwt.IntoFrame
+            A correlation matrix
+        index : str, optional
+            The column identifying the features, by default ""
+        transform : bool, optional
+            Whether to transfrom the correlation matrix to long form. A wide form
+            correlation matrix has columns that are features and an "index" that lists
+            the features. If False, the correlation matrix must already be in long form
+            with at least 3 columns, "f1", "f2", and "correlation" , by default True
+
+        Returns
+        -------
+        Self
+        """
         cm_nw = nw.from_native(corr_mat).lazy()
 
         if transform:
@@ -464,6 +680,16 @@ class CFE:
         return self
 
     def fit(self, X: nwt.IntoFrame):
+        """Fit from a DataFrame of features.
+
+        Parameters
+        ----------
+        X : nwt.IntoFrame
+
+        Returns
+        -------
+        Self
+        """
         corr_mat = correlation_matrix(X)
 
         self.fit_from_correlation_matrix(corr_mat)
@@ -471,7 +697,27 @@ class CFE:
         return self
 
     def transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : nwt.IntoFrameT
+
+        Returns
+        -------
+        nwt.IntoFrameT
+        """
         return nw.from_native(X).select(self.selected_features_).to_native()
 
     def fit_transform(self, X: nwt.IntoFrameT) -> nwt.IntoFrameT:
+        """Equivalent to calling `.fit(X).transform(X)`.
+
+        Parameters
+        ----------
+        X : nwt.IntoFrameT
+
+        Returns
+        -------
+        nwt.IntoFrameT
+        """
         return self.fit(X).transform(X)
