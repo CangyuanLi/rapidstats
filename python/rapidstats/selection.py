@@ -424,7 +424,8 @@ class RFE:
 
         return self
 
-    def load(self, path: str | Path):
+    @staticmethod
+    def load(path: str | Path):
         """Loads in an already fit selector.
 
         Parameters
@@ -436,9 +437,10 @@ class RFE:
         -------
         Self
         """
-        self.selected_features_ = _read_list(path)
+        x = RFE(estimator=None)
+        x.selected_features_ = _read_list(path)
 
-        return self
+        return x
 
 
 class NFEState(TypedDict):
@@ -611,7 +613,8 @@ class NFE:
 
         return self
 
-    def load(self, path: str | Path):
+    @staticmethod
+    def load(path: str | Path):
         """Loads in an already fit selector.
 
         Parameters
@@ -623,9 +626,10 @@ class NFE:
         -------
         Self
         """
-        self.selected_features_ = _read_list(path)
+        x = NFE(estimator=None)
+        x.selected_features_ = _read_list(path)
 
-        return self
+        return x
 
 
 class CFE:
@@ -818,7 +822,8 @@ class CFE:
 
         return self
 
-    def load(self, path: str | Path):
+    @staticmethod
+    def load(path: str | Path):
         """Loads in an already fit selector.
 
         Parameters
@@ -830,6 +835,7 @@ class CFE:
         -------
         Self
         """
-        self.selected_features_ = _read_list(path)
+        x = CFE()
+        x.selected_features_ = _read_list(path)
 
-        return self
+        return x
