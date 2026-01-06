@@ -58,12 +58,14 @@ class MinMaxScaler:
         return self
 
     def fit(self, X: nwt.IntoDataFrameT, columns: Optional[str | Iterable[str]] = None):
-        """_summary_
+        """Computes the min(s) and max(es) to be used for scaling.
 
         Parameters
         ----------
         X : nwt.IntoDataFrameT
-            _description_
+        columns : Optional[str | Iterable[str]], optional
+            The columns to apply scaling to. If None, all columns are scaled, by default
+            None
 
         Attributes
         ----------
@@ -73,15 +75,14 @@ class MinMaxScaler:
 
         Returns
         -------
-        self
-            Fitted MinMaxScaler
+        Self
         """
         X = nw.from_native(X, eager_only=True)
 
         self.feature_names_in_ = _resolve_columns(X, columns)
         data_min = X.select(nw.col(self.feature_names_in_).min())
         data_max = X.select(nw.col(self.feature_names_in_).max())
-        data_range: nwt.DataFrameT = data_max.select(
+        data_range: nwt.DataFrame = data_max.select(
             nw.col(c).__sub__(data_min[c]) for c in self.feature_names_in_
         )
 
@@ -148,9 +149,10 @@ class MinMaxScaler:
         Added in version 0.2.0
         ----------------------
         """
-        with zipfile.ZipFile(
-            path, "w"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "w") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             tmpdir = Path(tmpdir)
 
             self.min_.write_parquet(tmpdir / "min_.parquet")
@@ -185,9 +187,10 @@ class MinMaxScaler:
         Added in version 0.2.0
         ----------------------
         """
-        with zipfile.ZipFile(
-            path, "r"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "r") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             archive.extractall(tmpdir)
 
             self.min_ = nw.read_parquet(f"{tmpdir}/min_.parquet", native_namespace=pl)
@@ -260,9 +263,10 @@ class StandardScaler:
         return X.with_columns(self._run_one(c) for c in _resolve_columns(X, columns))
 
     def save(self, path: PathLike):
-        with zipfile.ZipFile(
-            path, "w"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "w") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             tmpdir = Path(tmpdir)
 
             self.mean_.write_parquet(tmpdir / "mean_.parquet")
@@ -282,9 +286,10 @@ class StandardScaler:
         return self
 
     def load(self, path: PathLike):
-        with zipfile.ZipFile(
-            path, "r"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "r") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             archive.extractall(tmpdir)
 
             self.mean_ = nw.read_parquet(f"{tmpdir}/mean_.parquet", native_namespace=pl)
@@ -352,9 +357,10 @@ class RobustScaler:
         return X.with_columns(self._run_one(c) for c in _resolve_columns(X, columns))
 
     def save(self, path: PathLike):
-        with zipfile.ZipFile(
-            path, "w"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "w") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             tmpdir = Path(tmpdir)
 
             self.median_.write_parquet(tmpdir / "median_.parquet")
@@ -374,9 +380,10 @@ class RobustScaler:
         return self
 
     def load(self, path: PathLike):
-        with zipfile.ZipFile(
-            path, "r"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "r") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             archive.extractall(tmpdir)
 
             self.median_ = nw.read_parquet(
@@ -426,9 +433,10 @@ class OneHotEncoder:
         return self.fit(X, columns=columns).transform(X)
 
     def save(self, path: PathLike):
-        with zipfile.ZipFile(
-            path, "w"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "w") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             tmpdir = Path(tmpdir)
 
             for k, v in self.categories_.items():
@@ -453,9 +461,10 @@ class OneHotEncoder:
         Added in version 0.2.0
         ----------------------
         """
-        with zipfile.ZipFile(
-            path, "r"
-        ) as archive, tempfile.TemporaryDirectory() as tmpdir:
+        with (
+            zipfile.ZipFile(path, "r") as archive,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
             archive.extractall(tmpdir)
 
             self.categories_ = {
