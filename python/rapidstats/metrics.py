@@ -1,10 +1,12 @@
 import dataclasses
 import typing
 from collections.abc import Iterable
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, cast
 
 import polars as pl
 from polars.series.series import ArrayLike
+
+from ._typing import PolarsFrameT
 
 from ._rustystats import (
     _adverse_impact_ratio,
@@ -372,7 +374,7 @@ def predicted_positive_ratio_at_thresholds(
     if strategy == "loop":
         df = lf.collect()
 
-        def _ppr(t: float) -> float:
+        def _ppr(t: float) -> dict:
             return {
                 "threshold": t,
                 "ppr": _weighted_mean(df["y_score"].ge(t), df["sample_weight"]),
@@ -406,7 +408,7 @@ def predicted_positive_ratio_at_thresholds(
             .pipe(_cumulative_ppr, sample_weight is not None)
             .rename({"y_score": "threshold"})
             .select("threshold", "ppr")
-            .unique("threshold")
+            .pipe(_dedup_ties)
             .pipe(_map_to_thresholds, thresholds)
             .drop("_threshold_actual", strict=False)
             .collect()
@@ -475,7 +477,7 @@ def _air_at_thresholds_core_sorted(
                 pl.col("cumulative_approved").truediv(pl.len()).alias("appr_rate")
             )
             .rename({"y_score": "threshold"})
-            .unique("threshold")
+            .pipe(_dedup_ties, keep="first")
         )
 
     def _appr_rate_sample_weight(pf: PolarsFrame) -> pl.LazyFrame:
@@ -494,7 +496,7 @@ def _air_at_thresholds_core_sorted(
                 .alias("appr_rate")
             )
             .rename({"y_score": "threshold"})
-            .unique("threshold")
+            .pipe(_dedup_ties, keep="first")
         )
 
     _appr_rate_func = _appr_rate_sample_weight if has_sample_weight else _appr_rate
@@ -689,6 +691,33 @@ def root_mean_squared_error(y_true: ArrayLike, y_score: ArrayLike) -> float:
     return _root_mean_squared_error(_regression_to_df(y_true, y_score))
 
 
+def _dedup_ties(
+    pf: PolarsFrameT,
+    col: str = "threshold",
+    keep: Literal["first", "last"] = "last",
+) -> PolarsFrameT:
+    """Deduplicate tied values in `col`, keeping either the first or last row per group.
+
+    Assumes `pf` is already sorted on `col`. Use `keep="last"` for descending sorts
+    (e.g. confusion matrix, PPR) and `keep="first"` for ascending sorts (e.g. AIR).
+    """
+    if keep == "last":
+        filter_expr = pl.col("_tie_group") != pl.col("_tie_group").shift(-1).fill_null(
+            -1
+        )
+    else:
+        filter_expr = pl.col("_tie_group") != pl.col("_tie_group").shift(1).fill_null(
+            -1
+        )
+
+    return cast(
+        PolarsFrameT,
+        pf.with_columns(pl.col(col).rle_id().alias("_tie_group"))
+        .filter(filter_expr)
+        .drop("_tie_group"),
+    )
+
+
 def _set_loop_strategy(
     thresholds: Optional[list[float]], strategy: LoopStrategy
 ) -> Literal["loop", "cum_sum"]:
@@ -706,7 +735,7 @@ def _set_loop_strategy(
     return strategy
 
 
-def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrame) -> PolarsFrame:
+def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrameT) -> PolarsFrameT:
     """Compute basic confusion matrix. Assumes that it is sorted.
 
     Parameters
@@ -741,23 +770,23 @@ def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrame) -> PolarsFrame:
             pl.col("tp").add(pl.col("fn")).alias("p"),
             pl.col("fp").add(pl.col("tn")).alias("n"),
         )
-        .with_columns(pl.col("threshold").rle_id().alias("_tie_group"))
-        .filter(pl.col("_tie_group") != pl.col("_tie_group").shift(-1).fill_null(-1))
-        .drop("_tie_group")
+        .pipe(_dedup_ties)
         .select("threshold", "tn", "fp", "fn", "tp")
     )
 
 
-def _base_confusion_matrix_at_thresholds(pf: PolarsFrame) -> PolarsFrame:
+def _base_confusion_matrix_at_thresholds(pf: PolarsFrameT) -> PolarsFrameT:
     return pf.sort("threshold", descending=True).pipe(
         _base_confusion_matrix_at_thresholds_sorted
     )
 
 
-def _full_confusion_matrix_from_base(pf: PolarsFrame, beta: float = 1.0) -> PolarsFrame:
+def _full_confusion_matrix_from_base(
+    pf: PolarsFrameT, beta: float = 1.0
+) -> PolarsFrameT:
     beta_squared = beta**2
 
-    return (
+    res = (
         pf.with_columns(
             pl.col("tp").add(pl.col("fn")).alias("p"),
             pl.col("fp").add(pl.col("tn")).alias("n"),
@@ -833,6 +862,8 @@ def _full_confusion_matrix_from_base(pf: PolarsFrame, beta: float = 1.0) -> Pola
         .pipe(_fill_infinite, None)
         .fill_nan(None)
     )
+
+    return cast(PolarsFrameT, res)
 
 
 def _map_to_thresholds(
@@ -951,7 +982,7 @@ def confusion_matrix_at_thresholds(
             .pipe(_base_confusion_matrix_at_thresholds)
             .pipe(_full_confusion_matrix_from_base, beta=beta)
             .select("threshold", *metrics)
-            .unique("threshold")
+            # .unique("threshold")
             .pipe(_map_to_thresholds, thresholds)
             .drop("_threshold_actual", strict=False)
             .unpivot(index="threshold")
@@ -1003,7 +1034,6 @@ def average_precision(
         .pipe(_full_confusion_matrix_from_base)
         .select("threshold", "precision", "tpr")
         .drop_nulls()
-        .unique("threshold")
         .sort("threshold")
         .select(_ap_from_pr_curve(pl.col("precision"), pl.col("tpr")).alias("ap"))
         .collect()["ap"]
