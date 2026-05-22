@@ -23,6 +23,7 @@ Y_PRED = Y_SCORE > 0.5
 Y_TRUE_SC = np.full(N_ROWS, True)
 Y_SCORE_SC = np.ones(N_ROWS)
 Y_PRED_SC = Y_SCORE_SC > 0.5
+Y_SCORE_INT = np.random.randint(low=300, high=850 + 1, size=N_ROWS)
 
 TRUE_PRED_COMBOS = [
     (Y_TRUE, Y_PRED),
@@ -34,6 +35,7 @@ TRUE_PRED_COMBOS = [
 TRUE_SCORE_COMBOS = [
     (Y_TRUE, Y_SCORE),
     (Y_TRUE_SC, Y_SCORE),
+    (Y_TRUE, Y_SCORE_INT),
 ]
 
 Y_TRUE_REG = np.random.rand(N_ROWS)
@@ -93,6 +95,13 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0, sample_weight=
         zero_division=np.nan,
         sample_weight=sample_weight,
     )
+
+    # sklearn uses tp and fp directly, so even though precision is 0 and tpr is 0 fbeta
+    # can be 0 instead of nan. We use precision and recall directly so if both are 0
+    # we get null.
+    if precision == 0 and tpr == 0:
+        fbeta = np.nan
+
     folkes_mallows_index = np.sqrt(precision * tpr)
     mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
         fnr * fpr * false_omission_rate * fdr
@@ -254,7 +263,13 @@ def test_max_ks(y_true, y_score):
     assert pytest.approx(fs, nan_ok=True) == ref
 
 
-@pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
+@pytest.mark.parametrize(
+    "y_true,y_score",
+    [
+        (Y_TRUE, Y_SCORE),
+        (Y_TRUE_SC, Y_SCORE),
+    ],
+)
 def test_brier_loss(y_true, y_score):
     ref = sklearn.metrics.brier_score_loss(y_true, y_score)
     res = rs.metrics.brier_loss(y_true, y_score)
@@ -288,7 +303,7 @@ def reference_confusion_matrix_at_thresholds(
     y_true, y_score, beta, sample_weight, thresholds
 ) -> pl.DataFrame:
     if thresholds is None:
-        thresholds = y_score
+        thresholds = pl.Series(y_score).unique().to_list()
     cms = []
     for t in thresholds:
         cms.append(
@@ -310,9 +325,12 @@ def reference_confusion_matrix_at_thresholds(
 )
 @pytest.mark.parametrize("loop_strategy", ["loop", "cum_sum"])
 @pytest.mark.parametrize("thresholds", [None, THRESHOLDS])
-def test_confusion_matrix_at_thresholds(beta, sample_weight, loop_strategy, thresholds):
-    y_true = Y_TRUE
-    y_score = Y_SCORE
+@pytest.mark.parametrize("y_true,y_score", TRUE_SCORE_COMBOS)
+def test_confusion_matrix_at_thresholds(
+    y_true, y_score, beta, sample_weight, loop_strategy, thresholds
+):
+    # y_true = Y_TRUE
+    # y_score = Y_SCORE
 
     ref = (
         reference_confusion_matrix_at_thresholds(

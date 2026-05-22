@@ -163,42 +163,49 @@ pub fn bootstrap_confusion_matrix(
     }
 }
 
-// fn _roc_auc_sorted(y_true: &[f64], sample_weight: &[f64]) -> f64 {
-//     let (auc, n_false) =
-//         y_true
-//             .iter()
-//             .zip(sample_weight)
-//             .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
-//                 let new_n_false = n_false + (1.0 - y_i) * w_i;
-//                 let new_auc = auc + y_i * w_i * new_n_false;
-//                 (new_auc, new_n_false)
-//             });
-
-//     let n_true = y_true
-//         .iter()
-//         .zip(sample_weight)
-//         .fold(0.0, |acc, (y_i, w_i)| acc + y_i * w_i);
-
-//     auc / (n_false * n_true)
-// }
-
 pub fn roc_auc_sorted(df: DataFrame) -> f64 {
     let y_true = df["y_true"].f64().unwrap();
+    let y_score = df["y_score"].f64().unwrap();
     let sample_weight = df["sample_weight"].f64().unwrap();
 
-    let (auc, n_false) = y_true
-        .into_no_null_iter()
-        .zip(sample_weight.into_no_null_iter())
-        .fold((0.0, 0.0), |(auc, n_false), (y_i, w_i)| {
-            let new_n_false = n_false + (1.0 - y_i) * w_i;
-            let new_auc = auc + y_i * w_i * new_n_false;
-            (new_auc, new_n_false)
-        });
+    // Rechunk to single chunk so .cont_slice() succeeds,
+    // avoiding per-element chunk lookups in the hot loop
+    let y_true = y_true.rechunk();
+    let y_score = y_score.rechunk();
+    let sample_weight = sample_weight.rechunk();
 
-    let n_true = y_true
-        .into_no_null_iter()
-        .zip(sample_weight.into_no_null_iter())
-        .fold(0.0, |acc, (y_i, w_i)| acc + y_i * w_i);
+    let y_true = y_true.cont_slice().unwrap();
+    let y_score = y_score.cont_slice().unwrap();
+    let sample_weight = sample_weight.cont_slice().unwrap();
+
+    let mut auc = 0.0f64;
+    let mut n_false = 0.0f64;
+    let mut n_true = 0.0f64;
+    let mut i = 0usize;
+
+    while i < y_true.len() {
+        let score_i = y_score[i];
+        let mut j = i + 1;
+        while j < y_true.len() && y_score[j] == score_i {
+            j += 1;
+        }
+
+        let mut group_pos = 0.0f64;
+        let mut group_neg = 0.0f64;
+        for k in i..j {
+            let w = sample_weight[k];
+            if y_true[k] == 1.0 {
+                group_pos += w;
+            } else {
+                group_neg += w;
+            }
+        }
+
+        auc += group_pos * (n_false + 0.5 * group_neg);
+        n_false += group_neg;
+        n_true += group_pos;
+        i = j;
+    }
 
     auc / (n_false * n_true)
 }

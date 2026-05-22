@@ -741,6 +741,9 @@ def _base_confusion_matrix_at_thresholds_sorted(pf: PolarsFrame) -> PolarsFrame:
             pl.col("tp").add(pl.col("fn")).alias("p"),
             pl.col("fp").add(pl.col("tn")).alias("n"),
         )
+        .with_columns(pl.col("threshold").rle_id().alias("_tie_group"))
+        .filter(pl.col("_tie_group") != pl.col("_tie_group").shift(-1).fill_null(-1))
+        .drop("_tie_group")
         .select("threshold", "tn", "fp", "fn", "tp")
     )
 
