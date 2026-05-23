@@ -80,53 +80,56 @@ def reference_confusion_matrix(y_true, y_pred, beta: float = 1.0, sample_weight=
         y_true, y_pred, labels=[False, True], sample_weight=sample_weight
     ).ravel()
 
-    p = tp + fn_
-    n = fp + tn
-    tpr = tp / p
-    fnr = 1.0 - tpr
-    fpr = fp / n
-    tnr = 1.0 - fpr
-    precision = sklearn.metrics.precision_score(
-        y_true,
-        y_pred,
-        labels=[False, True],
-        zero_division=np.nan,
-        sample_weight=sample_weight,
-    )
-    false_omission_rate = fn_ / (fn_ + tn)
-    plr = tpr / fpr
-    nlr = fnr / tnr
-    npv = 1.0 - false_omission_rate
-    fdr = 1.0 - precision
-    prevalence = p / (p + n)
-    informedness = tpr + tnr - 1.0
-    prevalence_threshold = (np.sqrt(tpr * fpr) - fpr) / (tpr - fpr)
-    markedness = precision - false_omission_rate
-    dor = plr / nlr
-    balanced_accuracy = (tpr + tnr) / 2
-    fbeta = sklearn.metrics.fbeta_score(
-        y_true,
-        y_pred,
-        beta=beta,
-        labels=[False, True],
-        zero_division=np.nan,
-        sample_weight=sample_weight,
-    )
+    with np.errstate(invalid="ignore", divide="ignore"):
+        p = tp + fn_
+        n = fp + tn
+        tpr = tp / p
+        fnr = 1.0 - tpr
+        fpr = fp / n
+        tnr = 1.0 - fpr
+        precision = sklearn.metrics.precision_score(
+            y_true,
+            y_pred,
+            labels=[False, True],
+            zero_division=np.nan,
+            sample_weight=sample_weight,
+        )
+        false_omission_rate = fn_ / (fn_ + tn)
+        plr = tpr / fpr
+        nlr = fnr / tnr
+        npv = 1.0 - false_omission_rate
+        fdr = 1.0 - precision
+        prevalence = p / (p + n)
+        informedness = tpr + tnr - 1.0
+        prevalence_threshold = (np.sqrt(tpr * fpr) - fpr) / (tpr - fpr)
+        markedness = precision - false_omission_rate
+        dor = plr / nlr
+        balanced_accuracy = (tpr + tnr) / 2
+        fbeta = sklearn.metrics.fbeta_score(
+            y_true,
+            y_pred,
+            beta=beta,
+            labels=[False, True],
+            zero_division=np.nan,
+            sample_weight=sample_weight,
+        )
 
-    # sklearn uses tp and fp directly, so even though precision is 0 and tpr is 0 fbeta
-    # can be 0 instead of nan. We use precision and recall directly so if both are 0
-    # we get null.
-    if precision == 0 and tpr == 0:
-        fbeta = np.nan
+        # sklearn uses tp and fp directly, so even though precision is 0 and tpr is 0
+        # fbeta can be 0 instead of nan. We use precision and recall directly so if
+        # both are 0 we get null.
+        if precision == 0 and tpr == 0:
+            fbeta = np.nan
 
-    folkes_mallows_index = np.sqrt(precision * tpr)
-    mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
-        fnr * fpr * false_omission_rate * fdr
-    )
-    acc = sklearn.metrics.accuracy_score(y_true, y_pred, sample_weight=sample_weight)
-    threat_score = tp / (tp + fn_ + fp)
-    ppr = (tp + fp) / (p + n)
-    pnr = (tn + fn_) / (p + n)
+        folkes_mallows_index = np.sqrt(precision * tpr)
+        mcc = np.sqrt(tpr * tnr * precision * npv) - np.sqrt(
+            fnr * fpr * false_omission_rate * fdr
+        )
+        acc = sklearn.metrics.accuracy_score(
+            y_true, y_pred, sample_weight=sample_weight
+        )
+        threat_score = tp / (tp + fn_ + fp)
+        ppr = (tp + fp) / (p + n)
+        pnr = (tn + fn_) / (p + n)
 
     return ConfusionMatrix(
         *[
@@ -390,7 +393,8 @@ def reference_adverse_impact_ratio(
     c = df.filter(pl.col("control"))
     appr_rate_control = np.average(c["approved"], weights=c["sample_weight"])
 
-    res = float(appr_rate_protected / appr_rate_control)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        res = float(appr_rate_protected / appr_rate_control)
 
     if math.isfinite(res):
         return res
