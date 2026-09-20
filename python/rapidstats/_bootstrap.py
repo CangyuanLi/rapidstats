@@ -8,7 +8,6 @@ from typing import Callable, Literal, Optional
 
 import polars as pl
 from polars.lazyframe.group_by import LazyGroupBy
-from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
 from ._distributions import Random, norm
@@ -28,6 +27,7 @@ from ._rustystats import (
     _percentile_interval,
     _standard_interval,
 )
+from ._typing import ArrayLike
 from ._utils import (
     _expr_fill_infinite,
     _fill_infinite,
@@ -268,7 +268,7 @@ def _poisson_sample(
         pf.with_row_index("index")
         .with_columns(repeats)
         .with_columns(pl.col("index").repeat_by("repeats"))
-        .explode("index")
+        .explode("index", empty_as_null=True)
         .drop_nulls("index")
         .drop("index", "repeats")
     )

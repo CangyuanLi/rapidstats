@@ -1,7 +1,8 @@
 import math
 
 import polars as pl
-from polars.series.series import ArrayLike
+
+from ._typing import ArrayLike
 
 
 def _bin_width_to_count(x: ArrayLike, bin_width: float) -> int:

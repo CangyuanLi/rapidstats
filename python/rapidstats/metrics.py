@@ -4,9 +4,6 @@ from collections.abc import Iterable
 from typing import Literal, Optional, Union, cast
 
 import polars as pl
-from polars.series.series import ArrayLike
-
-from ._typing import PolarsFrameT
 
 from ._rustystats import (
     _adverse_impact_ratio,
@@ -19,6 +16,7 @@ from ._rustystats import (
     _roc_auc,
     _root_mean_squared_error,
 )
+from ._typing import ArrayLike, PolarsFrameT
 from ._utils import (
     _fill_infinite,
     _regression_to_df,

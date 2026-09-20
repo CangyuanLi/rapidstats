@@ -23,7 +23,7 @@ def sort_arrays(*arrays):
 def test_auc(x, y):
     def reference_auc(x, y):
         x, y = sort_arrays(x, y)
-        return np.trapz(y, x)
+        return np.trapezoid(y, x)
 
     def rs_auc(x, y, method="trapezoidal"):
         df = pl.DataFrame({"x": x, "y": y})
