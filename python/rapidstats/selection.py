@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import copy
 import inspect
+import json
 import logging
 import math
-import json
 import pickle
 from collections.abc import Iterable
 from pathlib import Path
@@ -13,10 +13,10 @@ from typing import Any, Callable, Literal, Optional, Protocol, TypedDict
 import narwhals.stable.v1 as nw
 import narwhals.stable.v1.typing as nwt
 import polars as pl
-from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
 
 from ._corr import correlation_matrix
+from ._typing import ArrayLike
 from .metrics import roc_auc
 
 logger = logging.getLogger(__name__)

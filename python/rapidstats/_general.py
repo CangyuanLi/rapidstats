@@ -1,9 +1,9 @@
 from typing import Literal
 
 import polars as pl
-from polars.series.series import ArrayLike
 
 from ._rustystats import _rectangular_auc, _trapezoidal_auc
+from ._typing import ArrayLike
 
 
 def auc(

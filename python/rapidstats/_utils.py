@@ -3,8 +3,9 @@ import multiprocessing
 from typing import Literal, Optional, Union
 
 import polars as pl
-from polars.series.series import ArrayLike
 from tqdm.auto import tqdm
+
+from ._typing import ArrayLike
 
 PolarsFrame = Union[pl.LazyFrame, pl.DataFrame]
 

@@ -4,8 +4,8 @@ import typing
 from typing import Literal
 
 import polars as pl
-from polars.series.series import ArrayLike
 
+from ._typing import ArrayLike
 from .bin import auto, doane, freedman_diaconis, rice, scott, sqrt, sturges
 
 BinMethod = Literal["auto", "doane", "fd", "rice", "sturges", "scott", "sqrt"]
